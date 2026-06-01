@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário Express</title>
+    <title>Inventário Express 2 Passos</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         * {
@@ -54,17 +54,33 @@
             background: #000;
         }
 
+        /* Instrução Dinâmica */
+        .instrucao {
+            background-color: #0071e3;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            margin-top: 12px;
+            font-size: 15px;
+        }
+
+        .instrucao.etiqueta-foco {
+            background-color: #ff9500;
+        }
+
         /* Formulário de Seleção */
         .form-group {
-            margin-top: 16px;
+            margin-top: 12px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         label {
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 600;
             color: #86868b;
         }
 
@@ -75,11 +91,15 @@
             border-radius: 8px;
             font-size: 16px;
             background-color: #fff;
-            -webkit-appearance: none;
             transition: all 0.2s ease;
         }
 
-        /* Estados de feedback visual para o input */
+        /* Campo ativo onde o scanner vai jogar o texto */
+        .input-foco {
+            border: 2px solid #0071e3 !important;
+            background-color: #f0f7ff;
+        }
+
         .input-sucesso {
             background-color: #e8f5e9 !important;
             border-color: #34c759 !important;
@@ -142,7 +162,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         th, td {
@@ -176,6 +196,8 @@
     <div class="container">
         <div id="reader"></div>
         
+        <div id="textoInstrucao" class="instrucao">PASSO 1: Leia ou digite o S/N (Serial)</div>
+
         <div class="form-group">
             <label for="tipoAtivo">Tipo de Ativo:</label>
             <select id="tipoAtivo">
@@ -186,20 +208,26 @@
         </div>
 
         <div class="form-group">
-            <label for="codigoManual">Código Lido:</label>
-            <input type="text" id="codigoManual" placeholder="Aguardando leitura do código..." readonly>
+            <label for="inputSN">1º Passo - S/N (Número de Série):</label>
+            <input type="text" id="inputSN" class="input-foco" placeholder="Bipe ou digite o Serial...">
         </div>
 
-        <button class="btn btn-success" id="btnSalvar" style="display: none;">Salvar Item Manual</button>
+        <div class="form-group">
+            <label for="inputEtiqueta">2º Passo - Etiqueta (Patrimônio):</label>
+            <input type="text" id="inputEtiqueta" placeholder="Aguardando Serial...">
+        </div>
+
+        <button class="btn btn-success" id="btnSalvar">Avançar / Salvar Item</button>
     </div>
 
     <div class="table-container">
-        <div class="counter">Itens coletados no histórico: <span id="totalItens">0</span></div>
+        <div class="counter">Itens coletados: <span id="totalItens">0</span></div>
         <table id="tabelaItens">
             <thead>
                 <tr>
                     <th>Tipo</th>
-                    <th>Código</th>
+                    <th>S/N</th>
+                    <th>Etiqueta</th>
                 </tr>
             </thead>
             <tbody>
@@ -216,9 +244,12 @@
     <script>
         let dadosInventario = [];
         let estaProcessandoLeitura = false;
+        let passoAtual = "SN"; // Pode ser "SN" ou "ETIQUETA"
 
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
-        const codigoManualInput = document.getElementById('codigoManual');
+        const inputSN = document.getElementById('inputSN');
+        const inputEtiqueta = document.getElementById('inputEtiqueta');
+        const textoInstrucao = document.getElementById('textoInstrucao');
         const btnSalvar = document.getElementById('btnSalvar');
         const btnBaixarCSV = document.getElementById('btnBaixarCSV');
         const btnBaixarTXT = document.getElementById('btnBaixarTXT');
@@ -226,31 +257,36 @@
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
 
-        // Recupera o histórico acumulado de todos os dias
-        if (localStorage.getItem('inventario_acumulado_ativos')) {
-            dadosInventario = JSON.parse(localStorage.getItem('inventario_acumulado_ativos'));
+        // Resgata o histórico acumulado offline
+        if (localStorage.getItem('inventario_ativos_dois_passos')) {
+            dadosInventario = JSON.parse(localStorage.getItem('inventario_ativos_dois_passos'));
             atualizarTabela();
         }
 
-        // Evento de sucesso na leitura do código
+        // Evento disparado quando o Scanner lê um código
         function onScanSuccess(decodedText, decodedResult) {
             if (estaProcessandoLeitura) return;
-            
             estaProcessandoLeitura = true;
-            codigoManualInput.value = decodedText;
-            
-            salvarItem();
-            
+
+            if (passoAtual === "SN") {
+                inputSN.value = decodedText;
+                processarPassoSN();
+            } else if (passoAtual === "ETIQUETA") {
+                inputEtiqueta.value = decodedText;
+                processarPassoEtiqueta();
+            }
+
+            // Delay para tirar o celular de cima da etiqueta e não ler repetido na sequência imediata
             setTimeout(() => {
                 estaProcessandoLeitura = false;
             }, 1500);
         }
 
         function onScanFailure(error) {
-            // Ignora frames sem leitura válida
+            // Ignora varreduras sem foco
         }
 
-        // Inicialização do leitor
+        // Inicializa o Scanner otimizado para barras de hardware
         let html5QrcodeScanner = new Html5QrcodeScanner(
             "reader", 
             { 
@@ -274,42 +310,93 @@
         );
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-        // Validação e inserção na lista acumulada
-        function salvarItem() {
-            const codigo = codigoManualInput.value.trim();
-            const tipo = tipoAtivoSelect.value;
-            const dataHora = new Date().toLocaleString('pt-BR');
+        // Lógica do Passo 1: S/N
+        function processarPassoSN() {
+            const snVal = inputSN.value.trim();
+            if (!snVal) return;
 
-            if (!codigo) return;
-
-            // Validação anti-duplicidade histórica (procura em todo o histórico já salvo)
-            const codigoJaExiste = dadosInventario.some(item => item.codigo === codigo);
-
-            if (codigoJaExiste) {
-                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                codigoManualInput.classList.add('input-erro');
-                codigoManualInput.value = `DUPLICADO: ${codigo}`;
-                
-                alert(`Atenção!\nO código [ ${codigo} ] já existe no histórico acumulado deste inventário.`);
-                
-                codigoManualInput.classList.remove('input-erro');
-                codigoManualInput.value = '';
+            // Valida duplicidade de S/N no histórico
+            const snExiste = dadosInventario.some(item => item.sn === snVal);
+            if (snExiste) {
+                emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado!`);
+                inputSN.value = '';
                 return;
             }
 
+            // Avança para o passo da Etiqueta
             if (navigator.vibrate) navigator.vibrate(100);
-            codigoManualInput.classList.add('input-sucesso');
+            passoAtual = "ETIQUETA";
             
-            dadosInventario.push({ tipo, codigo, dataHora });
-            // Salva na chave acumulada que não zera sozinha
-            localStorage.setItem('inventario_acumulado_ativos', JSON.stringify(dadosInventario));
+            // Muda os focos visuais na tela do celular
+            textoInstrucao.textContent = "PASSO 2: Leia ou digite a ETIQUETA (Patrimônio)";
+            textoInstrucao.classList.add('etiqueta-foco');
+            inputSN.classList.remove('input-foco');
+            inputEtiqueta.classList.add('input-foco');
+            inputEtiqueta.placeholder = "Bipe ou digite a Etiqueta...";
+        }
+
+        // Lógica do Passo 2: Etiqueta e finalização do cadastro
+        function processarPassoEtiqueta() {
+            const snVal = inputSN.value.trim();
+            const etiquetaVal = inputEtiqueta.value.trim();
+            const tipo = tipoAtivoSelect.value;
+            const dataHora = new Date().toLocaleString('pt-BR');
+
+            if (!snVal) {
+                alert("O campo S/N ficou vazio. Voltando ao Passo 1.");
+                resetarFluxo();
+                return;
+            }
+
+            if (!etiquetaVal) return;
+
+            // Valida duplicidade da Etiqueta no histórico
+            const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
+            if (etiquetaExiste) {
+                emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada!`);
+                inputEtiqueta.value = '';
+                return;
+            }
+
+            // Sucesso total: Salva o registro completo
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            
+            dadosInventario.push({ tipo, sn: snVal, etiqueta: etiquetaVal, dataHora });
+            localStorage.setItem('inventario_ativos_dois_passos', JSON.stringify(dadosInventario));
             
             atualizarTabela();
+            resetarFluxo();
+        }
 
-            setTimeout(() => {
-                codigoManualInput.classList.remove('input-sucesso');
-                codigoManualInput.value = '';
-            }, 1000);
+        // Botão manual de ação (funciona tanto para avançar o SN quanto para salvar a etiqueta)
+        function cliqueBotaoManual() {
+            if (passoAtual === "SN") {
+                processarPassoSN();
+            } else {
+                processarPassoEtiqueta();
+            }
+        }
+
+        // Reseta o formulário voltando para o Passo 1
+        function resetarFluxo() {
+            passoAtual = "SN";
+            textoInstrucao.textContent = "PASSO 1: Leia ou digite o S/N (Serial)";
+            textoInstrucao.classList.remove('etiqueta-foco');
+            
+            inputSN.value = '';
+            inputEtiqueta.value = '';
+            inputEtiqueta.placeholder = "Aguardando Serial...";
+            
+            inputEtiqueta.classList.remove('input-foco');
+            inputSN.classList.add('input-foco');
+        }
+
+        // Emite alerta visual e sonoro de erro
+        function emitirErro(inputElement, mensagem) {
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            inputElement.classList.add('input-erro');
+            alert(mensagem);
+            inputElement.classList.remove('input-erro');
         }
 
         function atualizarTabela() {
@@ -320,13 +407,14 @@
                 const linha = document.createElement('tr');
                 linha.innerHTML = `
                     <td><strong>${item.tipo}</strong></td>
-                    <td>${item.codigo}</td>
+                    <td>${item.sn}</td>
+                    <td>${item.etiqueta}</td>
                 `;
                 tabelaCorpo.appendChild(linha);
             });
         }
 
-        // Exportação em formato TXT com nome fixo 'inventario.txt'
+        // Exportação Bloco de Notas (TXT)
         function baixarTXT() {
             if (dadosInventario.length === 0) {
                 alert('Não há dados para exportar.');
@@ -334,25 +422,26 @@
             }
 
             let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
-            txtContent += "=========================================================\n";
-            txtContent += "               HISTÓRICO ACUMULADO DE INVENTÁRIO         \n";
-            txtContent += "=========================================================\n\n";
-            txtContent += "TIPO         | CÓDIGO / SERIAL                 | DATA E HORA\n";
-            txtContent += "---------------------------------------------------------\n";
+            txtContent += "=========================================================================\n";
+            txtContent += "               HISTÓRICO ACUMULADO DE INVENTÁRIO (S/N + PATRIMÔNIO)       \n";
+            txtContent += "=========================================================================\n\n";
+            txtContent += "TIPO         | S/N (SERIAL)                 | ETIQUETA         | DATA E HORA\n";
+            txtContent += "-------------------------------------------------------------------------\n";
 
             dadosInventario.forEach(item => {
                 let tipoFormatado = item.tipo.padEnd(12, ' ');
-                let codigoFormatado = item.codigo.padEnd(31, ' ');
-                txtContent += `${tipoFormatado}| ${codigoFormatado}| ${item.dataHora}\n`;
+                let snFormatado = item.sn.padEnd(29, ' ');
+                let etqFormatado = item.etiqueta.padEnd(17, ' ');
+                txtContent += `${tipoFormatado}| ${snFormatado}| ${etqFormatado}| ${item.dataHora}\n`;
             });
 
-            txtContent += "\n---------------------------------------------------------\n";
+            txtContent += "\n-------------------------------------------------------------------------\n";
             txtContent += `Total global de itens coletados: ${dadosInventario.length}\n`;
 
             dispararDownload(txtContent, 'inventario.txt');
         }
 
-        // Exportação em formato CSV com nome fixo 'inventario.csv'
+        // Exportação Planilha (CSV)
         function baixarCSV() {
             if (dadosInventario.length === 0) {
                 alert('Não há dados para exportar.');
@@ -360,16 +449,15 @@
             }
 
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-            csvContent += "Tipo de Ativo;Codigo de Barras / Serial;Data e Hora\n";
+            csvContent += "Tipo de Ativo;Numero de Serie (SN);Etiqueta Patrimonio;Data e Hora\n";
 
             dadosInventario.forEach(item => {
-                csvContent += `"${item.tipo}";"${item.codigo}";"${item.dataHora}"\n`;
+                csvContent += `"${item.tipo}";"${item.sn}";"${item.etiqueta}";"${item.dataHora}"\n`;
             });
 
             dispararDownload(csvContent, 'inventario.csv');
         }
 
-        // Realiza o download com o nome de arquivo exato configurado
         function dispararDownload(conteudo, nomeArquivo) {
             const encodedUri = encodeURI(conteudo);
             const link = document.createElement("a");
@@ -381,17 +469,17 @@
             document.body.removeChild(link);
         }
 
-        // Esse botão limpa o histórico completo do celular se você quiser começar um inventário do zero
         function limparDados() {
-            if (confirm('ATENÇÃO!\nIsso apagará permanentemente TODO o histórico acumulado de todos os dias anteriores do celular. Deseja continuar?')) {
+            if (confirm('ATENÇÃO!\nIsso apagará permanentemente todo o histórico do celular. Continuar?')) {
                 dadosInventario = [];
-                localStorage.removeItem('inventario_acumulado_ativos');
+                localStorage.removeItem('inventario_ativos_dois_passos');
                 atualizarTabela();
-                codigoManualInput.value = '';
+                resetarFluxo();
             }
         }
 
-        btnSalvar.addEventListener('click', salvarItem);
+        // Eventos
+        btnSalvar.addEventListener('click', cliqueBotaoManual);
         btnBaixarCSV.addEventListener('click', baixarCSV);
         btnBaixarTXT.addEventListener('click', baixarTXT);
         btnLimpar.addEventListener('click', limparDados);
