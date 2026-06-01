@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário Express - Com Modal</title>
+    <title>Inventário Express - Edição Segura</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         * {
@@ -76,6 +76,7 @@
             font-size: 16px;
             background-color: #fff;
             transition: all 0.2s ease;
+            text-transform:uppercase;
         }
 
         .input-foco-azul {
@@ -105,7 +106,19 @@
         .btn-success { background-color: #34c759; color: white; }
         .btn-primary { background-color: #0071e3; color: white; }
         .btn-secondary { background-color: #86868b; color: white; }
-        .btn-cancel { background-color: #ff3b30; color: white; }
+        .btn-danger { background-color: #ff3b30; color: white; }
+
+        .btn-deletar-item {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .btn-deletar-item:hover { background-color: #ffebee; }
 
         /* Tabela / Lista de Itens */
         .counter {
@@ -113,12 +126,13 @@
             font-weight: 600;
             margin-bottom: 8px;
             color: #0071e3;
+            text-transform:uppercase;
         }
 
         .table-container {
             width: 100%;
             max-width: 500px;
-            max-height: 220px;
+            max-height: 260px;
             overflow-y: auto;
             background: #fff;
             border-radius: 12px;
@@ -137,20 +151,17 @@
             text-align: left;
             padding: 8px;
             border-bottom: 1px solid #e5e5ea;
+            vertical-align: middle;
+            text-transform:uppercase;
         }
 
         th { color: #86868b; font-weight: 500; }
         td { word-break: break-all; }
+        
+        .col-acoes { width: 40px; text-align: center; }
+        .actions-grid { width: 100%; max-width: 500px; display: block; }
 
-        .actions-grid {
-            width: 100%;
-            max-width: 500px;
-            display: block;
-        }
-
-        /* ==========================================
-           ESTILOS DO MODAL (ESTILO APPLE)
-           ========================================== */
+        /* Modais */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -184,27 +195,9 @@
             transition: transform 0.2s ease;
         }
 
-        .modal-overlay.active .modal-box {
-            transform: scale(1);
-        }
-
-        .modal-header {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1d1d1f;
-            margin-bottom: 14px;
-            text-align: center;
-        }
-
-        .modal-resumo-etiqueta {
-            background-color: #f5f5f7;
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 14px;
-            text-align: center;
-            margin-bottom: 12px;
-            border: 1px dashed #d2d2d7;
-        }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+        .modal-header { font-size: 18px; font-weight: 600; color: #1d1d1f; margin-bottom: 14px; text-align: center; }
+        .modal-resumo-etiqueta { background-color: #f5f5f7; padding: 10px; border-radius: 8px; font-size: 14px; text-align: left; margin-bottom: 16px; border: 1px dashed #d2d2d7; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -239,6 +232,8 @@
                     <th>Tipo</th>
                     <th>Etiqueta</th>
                     <th>S/N</th>
+                    <th>Setor</th>
+                    <th class="col-acoes"></th>
                 </tr>
             </thead>
             <tbody>
@@ -249,20 +244,23 @@
     <div class="actions-grid">
         <button class="btn btn-secondary" id="btnBaixarTXT">Baixar Bloco de Notas (TXT)</button>
         <button class="btn btn-primary" id="btnBaixarCSV" style="background-color: #5856d6;">Baixar Planilha (CSV)</button>
-        <button class="btn" style="background: #e5e5ea; color: #ff3b30; font-weight: 500;" id="btnLimpar">Limpar Histórico Completo</button>
     </div>
 
     <div class="modal-overlay" id="modalPasso2">
         <div class="modal-box">
-            <div class="modal-header">2º Passo: Informar Serial</div>
-            
-            <div class="modal-resumo-etiqueta">
+            <div class="modal-header">Completar Informações</div>
+            <div class="modal-resumo-etiqueta" style="text-align: center; margin-bottom: 8px;">
                 Etiqueta lida: <strong id="txtEtiquetaConfirmada">---</strong>
             </div>
-
+            
             <div class="form-group">
                 <label for="inputSN">Digite o S/N (Número de Série):</label>
                 <input type="text" id="inputSN" style="border: 2px solid #ff9500;" placeholder="Escreva o Serial aqui...">
+            </div>
+
+            <div class="form-group" style="margin-top: 8px;">
+                <label for="inputSetor">Informe o Setor / Localização:</label>
+                <input type="text" id="inputSetor" style="border: 2px solid #5856d6;" placeholder="Ex: RH, TI, Recepção...">
             </div>
 
             <button class="btn btn-success" id="btnSalvarModal" style="margin-top: 16px;">Salvar Item</button>
@@ -270,32 +268,52 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modalAcoesItem">
+        <div class="modal-box">
+            <div class="modal-header">O que deseja fazer?</div>
+            
+            <div class="modal-resumo-etiqueta" id="resumoItemAlvo">
+                </div>
+
+            <button class="btn btn-primary" id="btnEditarItem" style="background-color: #0071e3;">✏️ Mudar Informações (Editar)</button>
+            <button class="btn btn-danger" id="btnExcluirItem">🗑️ Excluir Permanentemente</button>
+            <button class="btn btn-secondary" id="btnFecharModalAcoes" style="background-color: #e5e5ea; color: #1d1d1f; margin-top: 8px; padding: 8px; font-size: 14px;">Voltar</button>
+        </div>
+    </div>
+
     <script>
         let dadosInventario = [];
         let estaProcessandoLeitura = false;
         let modalAberto = false;
+        let itemSelecionadoId = null;
+        let modoEdicao = false; // Nova flag para controlar se estamos editando um arquivo existente
 
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const inputEtiqueta = document.getElementById('inputEtiqueta');
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
         
-        // Elementos do Modal
+        // Elementos do Modal 1
         const modalPasso2 = document.getElementById('modalPasso2');
         const inputSN = document.getElementById('inputSN');
+        const inputSetor = document.getElementById('inputSetor');
         const txtEtiquetaConfirmada = document.getElementById('txtEtiquetaConfirmada');
         const btnSalvarModal = document.getElementById('btnSalvarModal');
         const btnCancelarModal = document.getElementById('btnCancelarModal');
 
-        // Carrega dados locais salvos
-        if (localStorage.getItem('inventario_modal_etiqueta_sn')) {
-            dadosInventario = JSON.parse(localStorage.getItem('inventario_modal_etiqueta_sn'));
+        // Elementos do Modal 2
+        const modalAcoesItem = document.getElementById('modalAcoesItem');
+        const resumoItemAlvo = document.getElementById('resumoItemAlvo');
+        const btnEditarItem = document.getElementById('btnEditarItem');
+        const btnExcluirItem = document.getElementById('btnExcluirItem');
+        const btnFecharModalAcoes = document.getElementById('btnFecharModalAcoes');
+
+        if (localStorage.getItem('inventario_modal_etiqueta_sn_setor')) {
+            dadosInventario = JSON.parse(localStorage.getItem('inventario_modal_etiqueta_sn_setor'));
             atualizarTabela();
         }
 
-        // Resposta de sucesso do Scanner de Câmera
         function onScanSuccess(decodedText, decodedResult) {
-            // Se já tiver um modal aberto, ignora novas leituras da câmera de fundo
             if (estaProcessandoLeitura || modalAberto) return;
             estaProcessandoLeitura = true;
 
@@ -305,9 +323,8 @@
             setTimeout(() => { estaProcessandoLeitura = false; }, 1500);
         }
 
-        function onScanFailure(error) { /* Ignora falhas de foco */ }
+        function onScanFailure(error) {}
 
-        // Inicializa Câmera
         let html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
             fps: 25, 
             qrbox: function(w, h) { return { width: Math.floor(w * 0.85), height: Math.floor(h * 0.35) }; },
@@ -320,87 +337,168 @@
         }, false);
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-        // Valida o primeiro passo (Etiqueta)
         function processarEtiqueta() {
             const etiquetaVal = inputEtiqueta.value.trim();
             if (!etiquetaVal) return;
 
-            // Valida duplicidade da Etiqueta
-            const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
-            if (etiquetaExiste) {
-                emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada anteriormente!`);
-                inputEtiqueta.value = '';
-                return;
+            // Se NÃO for modo de edição, barra etiquetas duplicadas na lista ativa
+            if (!modoEdicao) {
+                const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
+                if (etiquetaExiste) {
+                    emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada anteriormente!`);
+                    inputEtiqueta.value = '';
+                    return;
+                }
             }
 
-            // Abre o Modal para o passo do S/N
             if (navigator.vibrate) navigator.vibrate(100);
             
             modalAberto = true;
             txtEtiquetaConfirmada.textContent = etiquetaVal;
             modalPasso2.classList.add('active');
             
-            // Joga o foco direto no input de escrever o serial
             setTimeout(() => { inputSN.focus(); }, 250);
         }
 
-        // Valida e finaliza salvando com o S/N fornecido no Modal
-        function finalizarComSN() {
+        function finalizarSalvarItem() {
             const etiquetaVal = inputEtiqueta.value.trim();
             const snVal = inputSN.value.trim();
+            const setorVal = inputSetor.value.trim() || "Não Informado";
             const tipo = tipoAtivoSelect.value;
             const dataHora = new Date().toLocaleString('pt-BR');
 
-            if (!etiquetaVal) {
-                fecharModal();
+            if (!etiquetaVal) { fecharModal(); return; }
+            if (!snVal) {
+                alert("O Número de Série (S/N) é obrigatório.");
                 return;
             }
 
-            if (!snVal) return;
-
-            // Valida duplicidade do S/N
-            const snExiste = dadosInventario.some(item => item.sn === snVal);
+            // Se for nova inclusão ou se mudou o S/N, valida se já existe em OUTRO item
+            const snExiste = dadosInventario.some(item => item.sn === snVal && item.id !== itemSelecionadoId);
             if (snExiste) {
-                emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado anteriormente!`);
+                emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado em outro ativo!`);
                 inputSN.value = '';
                 return;
             }
 
-            // Grava os dados
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             
-            dadosInventario.push({ tipo, etiqueta: etiquetaVal, sn: snVal, dataHora });
-            localStorage.setItem('inventario_modal_etiqueta_sn', JSON.stringify(dadosInventario));
-            
+            if (modoEdicao && itemSelecionadoId) {
+                // Modo Edição: Localiza e substitui os dados direto no mesmo ID sem sumir antes
+                dadosInventario = dadosInventario.map(item => {
+                    if (item.id === itemSelecionadoId) {
+                        return { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal };
+                    }
+                    return item;
+                });
+            } else {
+                // Modo Inclusão comum
+                const idUnico = Date.now();
+                dadosInventario.push({ id: idUnico, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora });
+            }
+
+            localStorage.setItem('inventario_modal_etiqueta_sn_setor', JSON.stringify(dadosInventario));
             atualizarTabela();
             fecharModal();
         }
 
         function fecharModal() {
             modalAberto = false;
+            modoEdicao = false; // Desliga a flag de edição ao fechar
+            itemSelecionadoId = null; 
             modalPasso2.classList.remove('active');
             inputEtiqueta.value = '';
             inputSN.value = '';
+            inputSetor.value = '';
             setTimeout(() => { inputEtiqueta.focus(); }, 200);
         }
 
-        // Ouvintes de digitação manual para a Etiqueta (Garante o fluxo se não usar a câmera)
+        function abrirModalAcoes(idItem) {
+            const itemAlvo = dadosInventario.find(item => item.id === idItem);
+            if (!itemAlvo) return;
+
+            itemSelecionadoId = idItem;
+            modalAberto = true;
+
+            resumoItemAlvo.innerHTML = `
+                <strong>Ativo:</strong> ${itemAlvo.tipo}<br>
+                <strong>Patrimônio:</strong> ${itemAlvo.etiqueta}<br>
+                <strong>S/N:</strong> ${itemAlvo.sn}<br>
+                <strong>Setor:</strong> ${itemAlvo.setor || "Não Informado"}
+            `;
+
+            modalAcoesItem.classList.add('active');
+        }
+
+        function fecharModalAcoes() {
+            if (!modoEdicao) {
+                itemSelecionadoId = null;
+            }
+            modalAberto = false;
+            modalAcoesItem.classList.remove('active');
+        }
+
+        function confirmarExclusao() {
+            if (itemSelecionadoId) {
+                dadosInventario = dadosInventario.filter(item => item.id !== itemSelecionadoId);
+                localStorage.setItem('inventario_modal_etiqueta_sn_setor', JSON.stringify(dadosInventario));
+                atualizarTabela();
+                modoEdicao = false;
+                itemSelecionadoId = null;
+                fecharModalAcoes();
+            }
+        }
+
+        function iniciarEdicao() {
+            if (itemSelecionadoId) {
+                const itemAlvo = dadosInventario.find(item => item.id === itemSelecionadoId);
+                if (itemAlvo) {
+                    modoEdicao = true; // Ativa o modo de segurança de edição
+
+                    // Joga as informações atuais dele de volta pros campos visuais
+                    tipoAtivoSelect.value = itemAlvo.tipo;
+                    inputEtiqueta.value = itemAlvo.etiqueta;
+
+                    fecharModalAcoes();
+
+                    // Sobe o painel com as informações para alteração, mas mantendo a linha original salva
+                    modalAberto = true;
+                    txtEtiquetaConfirmada.textContent = itemAlvo.etiqueta;
+                    inputSN.value = itemAlvo.sn;
+                    inputSetor.value = itemAlvo.setor || "";
+                    
+                    modalPasso2.classList.add('active');
+                    setTimeout(() => { inputSN.focus(); }, 250);
+                }
+            }
+        }
+
+        // Ouvintes Manuais
         inputEtiqueta.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') { e.preventDefault(); processarEtiqueta(); }
         });
         inputEtiqueta.addEventListener('change', function() {
             if (!modalAberto && inputEtiqueta.value.trim().length > 0) { processarEtiqueta(); }
         });
-
-        // Ouvintes do teclado no campo de S/N dentro do Modal
+        
         inputSN.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); finalizarComSN(); }
+            if (e.key === 'Enter') { 
+                e.preventDefault(); 
+                inputSetor.focus(); 
+            }
         });
 
-        function emitirErro(inputElement, mensagem) {
+        inputSetor.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { 
+                e.preventDefault(); 
+                finalizarSalvarItem(); 
+            }
+        });
+
+        function emitirErro(inputElement, message) {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             inputElement.classList.add('input-erro');
-            alert(mensagem);
+            alert(message);
             inputElement.classList.remove('input-erro');
         }
 
@@ -414,21 +512,28 @@
                     <td><strong>${item.tipo}</strong></td>
                     <td>${item.etiqueta}</td>
                     <td>${item.sn}</td>
+                    <td><span style="color: #5856d6; font-weight: 500;">${item.setor || "Não Informado"}</span></td>
+                    <td class="col-acoes">
+                        <button class="btn-deletar-item" onclick="abrirModalAcoes(${item.id})" title="Opções do item">🗑️</button>
+                    </td>
                 `;
                 tabelaCorpo.appendChild(linha);
             });
         }
 
-        // Downloads de arquivos estáticos
         function baixarTXT() {
             if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
             let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
-            txtContent += "TIPO         | ETIQUETA         | S/N (SERIAL)                 | DATA E HORA\n-------------------------------------------------------------------------\n";
+            txtContent += "=========================================================================================\n";
+            txtContent += "               HISTÓRICO ACUMULADO DE INVENTÁRIO (ETIQUETA + S/N + SETOR)       \n";
+            txtContent += "=========================================================================================\n\n";
+            txtContent += "TIPO         | ETIQUETA         | S/N (SERIAL)                 | SETOR        | DATA E HORA\n-----------------------------------------------------------------------------------------\n";
             dadosInventario.forEach(item => {
                 let tipoFormatado = item.tipo.padEnd(12, ' ');
                 let etqFormatado = item.etiqueta.padEnd(17, ' ');
                 let snFormatado = item.sn.padEnd(29, ' ');
-                txtContent += `${tipoFormatado}| ${etqFormatado}| ${snFormatado}| ${item.dataHora}\n`;
+                let setorFormatado = (item.setor || "N/I").padEnd(13, ' ');
+                txtContent += `${tipoFormatado}| ${etqFormatado}| ${snFormatado}| ${setorFormatado}| ${item.dataHora}\n`;
             });
             dispararDownload(txtContent, 'inventario.txt');
         }
@@ -436,9 +541,9 @@
         function baixarCSV() {
             if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-            csvContent += "Tipo de Ativo;Etiqueta Patrimonio;Numero de Serie (SN);Data e Hora\n";
+            csvContent += "Tipo de Ativo;Etiqueta Patrimonio;Numero de Serie (SN);Setor;Data e Hora\n";
             dadosInventario.forEach(item => {
-                csvContent += `"${item.tipo}";"${item.etiqueta}";"${item.sn}";"${item.dataHora}"\n`;
+                csvContent += `"${item.tipo}";"${item.etiqueta}";"${item.sn}";"${item.setor || "Não Informado"}";"${item.dataHora}"\n`;
             });
             dispararDownload(csvContent, 'inventario.csv');
         }
@@ -453,18 +558,16 @@
             document.body.removeChild(link);
         }
 
-        btnSalvarModal.addEventListener('click', finalizarComSN);
+        btnSalvarModal.addEventListener('click', finalizarSalvarItem);
         btnCancelarModal.addEventListener('click', fecharModal);
+        
+        btnExcluirItem.addEventListener('click', confirmarExclusao);
+        btnEditarItem.addEventListener('click', iniciarEdicao);
+        btnFecharModalAcoes.addEventListener('click', fecharModalAcoes);
+        
         document.getElementById('btnBaixarCSV').addEventListener('click', baixarCSV);
         document.getElementById('btnBaixarTXT').addEventListener('click', baixarTXT);
-        document.getElementById('btnLimpar').addEventListener('click', () => {
-            if (confirm('Apagar todo o histórico acumulado?')) {
-                dadosInventario = []; localStorage.removeItem('inventario_modal_etiqueta_sn');
-                atualizarTabela(); fecharModal();
-            }
-        });
         
-        // Inicializa cursor na Etiqueta
         inputEtiqueta.focus();
     </script>
 </body>
