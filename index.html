@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário Express - Etiqueta + S/N</title>
+    <title>Inventário Express - Com Modal</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         * {
@@ -54,22 +54,6 @@
             background: #000;
         }
 
-        /* Instrução Dinâmica */
-        .instrucao {
-            background-color: #0071e3;
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: 600;
-            margin-top: 12px;
-            font-size: 15px;
-        }
-
-        .instrucao.sn-foco {
-            background-color: #ff9500;
-        }
-
         /* Formulário de Seleção */
         .form-group {
             margin-top: 12px;
@@ -94,25 +78,14 @@
             transition: all 0.2s ease;
         }
 
-        /* Destaques visuais de foco nos inputs */
         .input-foco-azul {
             border: 2px solid #0071e3 !important;
             background-color: #f0f7ff;
         }
 
-        .input-foco-laranja {
-            border: 2px solid #ff9500 !important;
-            background-color: #fffaf2;
-        }
-
         .input-erro {
             background-color: #ffebee !important;
             border-color: #ff3b30 !important;
-        }
-
-        .input-sucesso {
-            background-color: #e8f5e9 !important;
-            border-color: #34c759 !important;
         }
 
         /* Botões */
@@ -129,20 +102,10 @@
             text-align: center;
         }
 
-        .btn-success {
-            background-color: #34c759;
-            color: white;
-        }
-
-        .btn-primary {
-            background-color: #0071e3;
-            color: white;
-        }
-
-        .btn-secondary {
-            background-color: #86868b;
-            color: white;
-        }
+        .btn-success { background-color: #34c759; color: white; }
+        .btn-primary { background-color: #0071e3; color: white; }
+        .btn-secondary { background-color: #86868b; color: white; }
+        .btn-cancel { background-color: #ff3b30; color: white; }
 
         /* Tabela / Lista de Itens */
         .counter {
@@ -176,19 +139,71 @@
             border-bottom: 1px solid #e5e5ea;
         }
 
-        th {
-            color: #86868b;
-            font-weight: 500;
-        }
-
-        td {
-            word-break: break-all;
-        }
+        th { color: #86868b; font-weight: 500; }
+        td { word-break: break-all; }
 
         .actions-grid {
             width: 100%;
             max-width: 500px;
             display: block;
+        }
+
+        /* ==========================================
+           ESTILOS DO MODAL (ESTILO APPLE)
+           ========================================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-box {
+            width: 90%;
+            max-width: 400px;
+            background-color: #ffffff;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+
+        .modal-overlay.active .modal-box {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+
+        .modal-resumo-etiqueta {
+            background-color: #f5f5f7;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 12px;
+            border: 1px dashed #d2d2d7;
         }
     </style>
 </head>
@@ -200,10 +215,8 @@
 
     <div class="container">
         <div id="reader"></div>
-        
-        <div id="textoInstrucao" class="instrucao">PASSO 1: Leia ou digite a ETIQUETA (Patrimônio)</div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-top: 16px;">
             <label for="tipoAtivo">Tipo de Ativo:</label>
             <select id="tipoAtivo">
                 <option value="Monitor">Monitor</option>
@@ -213,16 +226,9 @@
         </div>
 
         <div class="form-group">
-            <label for="inputEtiqueta">1º Passo - Etiqueta (Patrimônio):</label>
-            <input type="text" id="inputEtiqueta" class="input-foco-azul" placeholder="Bipe ou digite a Etiqueta...">
+            <label for="inputEtiqueta">Leia ou digite a ETIQUETA (Patrimônio):</label>
+            <input type="text" id="inputEtiqueta" class="input-foco-azul" placeholder="Aguardando bip ou digitação...">
         </div>
-
-        <div class="form-group">
-            <label for="inputSN">2º Passo - S/N (Número de Série):</label>
-            <input type="text" id="inputSN" placeholder="Aguardando Etiqueta...">
-        </div>
-
-        <button class="btn btn-success" id="btnSalvar">Avançar / Salvar Manual</button>
     </div>
 
     <div class="table-container">
@@ -246,80 +252,80 @@
         <button class="btn" style="background: #e5e5ea; color: #ff3b30; font-weight: 500;" id="btnLimpar">Limpar Histórico Completo</button>
     </div>
 
+    <div class="modal-overlay" id="modalPasso2">
+        <div class="modal-box">
+            <div class="modal-header">2º Passo: Informar Serial</div>
+            
+            <div class="modal-resumo-etiqueta">
+                Etiqueta lida: <strong id="txtEtiquetaConfirmada">---</strong>
+            </div>
+
+            <div class="form-group">
+                <label for="inputSN">Digite o S/N (Número de Série):</label>
+                <input type="text" id="inputSN" style="border: 2px solid #ff9500;" placeholder="Escreva o Serial aqui...">
+            </div>
+
+            <button class="btn btn-success" id="btnSalvarModal" style="margin-top: 16px;">Salvar Item</button>
+            <button class="btn btn-secondary" id="btnCancelarModal" style="background-color: #e5e5ea; color: #1d1d1f; margin-top: 8px; padding: 8px; font-size: 14px;">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         let dadosInventario = [];
         let estaProcessandoLeitura = false;
-        let passoAtual = "ETIQUETA"; // O fluxo agora inicia cobrando a ETIQUETA
+        let modalAberto = false;
 
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const inputEtiqueta = document.getElementById('inputEtiqueta');
-        const inputSN = document.getElementById('inputSN');
-        const textoInstrucao = document.getElementById('textoInstrucao');
-        const btnSalvar = document.getElementById('btnSalvar');
-        const btnBaixarCSV = document.getElementById('btnBaixarCSV');
-        const btnBaixarTXT = document.getElementById('btnBaixarTXT');
-        const btnLimpar = document.getElementById('btnLimpar');
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
+        
+        // Elementos do Modal
+        const modalPasso2 = document.getElementById('modalPasso2');
+        const inputSN = document.getElementById('inputSN');
+        const txtEtiquetaConfirmada = document.getElementById('txtEtiquetaConfirmada');
+        const btnSalvarModal = document.getElementById('btnSalvarModal');
+        const btnCancelarModal = document.getElementById('btnCancelarModal');
 
-        // Carrega histórico offline em cache
-        if (localStorage.getItem('inventario_ativos_etiqueta_sn')) {
-            dadosInventario = JSON.parse(localStorage.getItem('inventario_ativos_etiqueta_sn'));
+        // Carrega dados locais salvos
+        if (localStorage.getItem('inventario_modal_etiqueta_sn')) {
+            dadosInventario = JSON.parse(localStorage.getItem('inventario_modal_etiqueta_sn'));
             atualizarTabela();
         }
 
         // Resposta de sucesso do Scanner de Câmera
         function onScanSuccess(decodedText, decodedResult) {
-            if (estaProcessandoLeitura) return;
+            // Se já tiver um modal aberto, ignora novas leituras da câmera de fundo
+            if (estaProcessandoLeitura || modalAberto) return;
             estaProcessandoLeitura = true;
 
-            if (passoAtual === "ETIQUETA") {
-                inputEtiqueta.value = decodedText;
-                processarPassoEtiqueta();
-            } else if (passoAtual === "SN") {
-                inputSN.value = decodedText;
-                processarPassoSN();
-            }
+            inputEtiqueta.value = decodedText;
+            processarEtiqueta();
 
-            setTimeout(() => {
-                estaProcessandoLeitura = false;
-            }, 1500);
+            setTimeout(() => { estaProcessandoLeitura = false; }, 1500);
         }
 
-        function onScanFailure(error) {
-            // Ignora frames sem foco na busca por códigos
-        }
+        function onScanFailure(error) { /* Ignora falhas de foco */ }
 
-        // Inicialização do Scanner
-        let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 25, 
-                qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    return {
-                        width: Math.floor(viewfinderWidth * 0.85),
-                        height: Math.floor(viewfinderHeight * 0.35)
-                    };
-                },
-                rememberLastUsedCamera: true,
-                formatsToSupport: [ 
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.EAN_13
-                ],
-                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-            },
-            /* verbose= */ false
-        );
+        // Inicializa Câmera
+        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+            fps: 25, 
+            qrbox: function(w, h) { return { width: Math.floor(w * 0.85), height: Math.floor(h * 0.35) }; },
+            rememberLastUsedCamera: true,
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.EAN_13
+            ],
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        }, false);
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-        // Lógica do Passo 1: Processar e Validar Etiqueta
-        function processarPassoEtiqueta() {
+        // Valida o primeiro passo (Etiqueta)
+        function processarEtiqueta() {
             const etiquetaVal = inputEtiqueta.value.trim();
             if (!etiquetaVal) return;
 
-            // Valida se a Etiqueta já existe
+            // Valida duplicidade da Etiqueta
             const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
             if (etiquetaExiste) {
                 emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada anteriormente!`);
@@ -327,37 +333,32 @@
                 return;
             }
 
-            // Avança para o passo do S/N (para digitar na mão)
+            // Abre o Modal para o passo do S/N
             if (navigator.vibrate) navigator.vibrate(100);
-            passoAtual = "SN";
             
-            textoInstrucao.textContent = "PASSO 2: Digite ou leia o S/N (Número de Série)";
-            textoInstrucao.classList.add('sn-foco');
+            modalAberto = true;
+            txtEtiquetaConfirmada.textContent = etiquetaVal;
+            modalPasso2.classList.add('active');
             
-            inputEtiqueta.classList.remove('input-foco-azul');
-            inputSN.classList.add('input-foco-laranja');
-            inputSN.placeholder = "Escreva o Serial na mão...";
-            
-            // Coloca o cursor piscando automaticamente no campo do Serial
-            inputSN.focus();
+            // Joga o foco direto no input de escrever o serial
+            setTimeout(() => { inputSN.focus(); }, 250);
         }
 
-        // Lógica do Passo 2: Processar S/N e salvar definitivo
-        function processarPassoSN() {
+        // Valida e finaliza salvando com o S/N fornecido no Modal
+        function finalizarComSN() {
             const etiquetaVal = inputEtiqueta.value.trim();
             const snVal = inputSN.value.trim();
             const tipo = tipoAtivoSelect.value;
             const dataHora = new Date().toLocaleString('pt-BR');
 
             if (!etiquetaVal) {
-                alert("O campo Etiqueta ficou vazio por engano. Voltando ao Passo 1.");
-                resetarFluxo();
+                fecharModal();
                 return;
             }
 
             if (!snVal) return;
 
-            // Valida se o S/N já existe
+            // Valida duplicidade do S/N
             const snExiste = dadosInventario.some(item => item.sn === snVal);
             if (snExiste) {
                 emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado anteriormente!`);
@@ -365,70 +366,36 @@
                 return;
             }
 
-            // Sucesso - Junta os 2 dados na planilha interna
+            // Grava os dados
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             
             dadosInventario.push({ tipo, etiqueta: etiquetaVal, sn: snVal, dataHora });
-            localStorage.setItem('inventario_ativos_etiqueta_sn', JSON.stringify(dadosInventario));
+            localStorage.setItem('inventario_modal_etiqueta_sn', JSON.stringify(dadosInventario));
             
             atualizarTabela();
-            resetarFluxo();
+            fecharModal();
         }
 
-        // ==========================================
-        // DETECÇÃO DE DIGITAÇÃO MANUAL (ENTER / CHANGE)
-        // ==========================================
-        
-        // Monitora o teclado manual do campo de Etiqueta
-        inputEtiqueta.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                processarPassoEtiqueta();
-            }
-        });
-        inputEtiqueta.addEventListener('change', function() {
-            if (passoAtual === "ETIQUETA" && inputEtiqueta.value.trim().length > 0) {
-                processarPassoEtiqueta();
-            }
-        });
-
-        // Monitora o teclado manual do campo do S/N (Onde você vai escrever na mão)
-        inputSN.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                processarPassoSN(); // Salva o item ao dar "Enter/Ir" no teclado
-            }
-        });
-        inputSN.addEventListener('change', function() {
-            if (passoAtual === "SN" && inputSN.value.trim().length > 0) {
-                processarPassoSN(); // Salva o item ao mudar de foco
-            }
-        });
-        // ==========================================
-
-        function cliqueBotaoManual() {
-            if (passoAtual === "ETIQUETA") {
-                processarPassoEtiqueta();
-            } else {
-                processarPassoSN();
-            }
-        }
-
-        function resetarFluxo() {
-            passoAtual = "ETIQUETA";
-            textoInstrucao.textContent = "PASSO 1: Leia ou digite a ETIQUETA (Patrimônio)";
-            textoInstrucao.classList.remove('sn-foco');
-            
+        function fecharModal() {
+            modalAberto = false;
+            modalPasso2.classList.remove('active');
             inputEtiqueta.value = '';
             inputSN.value = '';
-            inputSN.placeholder = "Aguardando Etiqueta...";
-            
-            inputSN.classList.remove('input-foco-laranja');
-            inputEtiqueta.classList.add('input-foco-azul');
-            
-            // Devolve o cursor piscando pronto para a próxima etiqueta
-            inputEtiqueta.focus();
+            setTimeout(() => { inputEtiqueta.focus(); }, 200);
         }
+
+        // Ouvintes de digitação manual para a Etiqueta (Garante o fluxo se não usar a câmera)
+        inputEtiqueta.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); processarEtiqueta(); }
+        });
+        inputEtiqueta.addEventListener('change', function() {
+            if (!modalAberto && inputEtiqueta.value.trim().length > 0) { processarEtiqueta(); }
+        });
+
+        // Ouvintes do teclado no campo de S/N dentro do Modal
+        inputSN.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); finalizarComSN(); }
+        });
 
         function emitirErro(inputElement, mensagem) {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
@@ -452,47 +419,27 @@
             });
         }
 
-        // Exportação Bloco de Notas (TXT) - Nome fixo 'inventario.txt'
+        // Downloads de arquivos estáticos
         function baixarTXT() {
-            if (dadosInventario.length === 0) {
-                alert('Não há dados para exportar.');
-                return;
-            }
-
+            if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
             let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
-            txtContent += "=========================================================================\n";
-            txtContent += "               HISTÓRICO ACUMULADO DE INVENTÁRIO (ETIQUETA + S/N)       \n";
-            txtContent += "=========================================================================\n\n";
-            txtContent += "TIPO         | ETIQUETA         | S/N (SERIAL)                 | DATA E HORA\n";
-            txtContent += "-------------------------------------------------------------------------\n";
-
+            txtContent += "TIPO         | ETIQUETA         | S/N (SERIAL)                 | DATA E HORA\n-------------------------------------------------------------------------\n";
             dadosInventario.forEach(item => {
                 let tipoFormatado = item.tipo.padEnd(12, ' ');
                 let etqFormatado = item.etiqueta.padEnd(17, ' ');
                 let snFormatado = item.sn.padEnd(29, ' ');
                 txtContent += `${tipoFormatado}| ${etqFormatado}| ${snFormatado}| ${item.dataHora}\n`;
             });
-
-            txtContent += "\n-------------------------------------------------------------------------\n";
-            txtContent += `Total global de itens coletados: ${dadosInventario.length}\n`;
-
             dispararDownload(txtContent, 'inventario.txt');
         }
 
-        // Exportação Planilha (CSV) - Nome fixo 'inventario.csv'
         function baixarCSV() {
-            if (dadosInventario.length === 0) {
-                alert('Não há dados para exportar.');
-                return;
-            }
-
+            if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += "Tipo de Ativo;Etiqueta Patrimonio;Numero de Serie (SN);Data e Hora\n";
-
             dadosInventario.forEach(item => {
                 csvContent += `"${item.tipo}";"${item.etiqueta}";"${item.sn}";"${item.dataHora}"\n`;
             });
-
             dispararDownload(csvContent, 'inventario.csv');
         }
 
@@ -501,26 +448,24 @@
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             link.setAttribute("download", nomeArquivo);
-            
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
 
-        function limparDados() {
-            if (confirm('ATENÇÃO!\nIsso apagará permanentemente todo o histórico acumulado do celular. Continuar?')) {
-                dadosInventario = [];
-                localStorage.removeItem('inventario_ativos_etiqueta_sn');
-                atualizarTabela();
-                resetarFluxo();
+        btnSalvarModal.addEventListener('click', finalizarComSN);
+        btnCancelarModal.addEventListener('click', fecharModal);
+        document.getElementById('btnBaixarCSV').addEventListener('click', baixarCSV);
+        document.getElementById('btnBaixarTXT').addEventListener('click', baixarTXT);
+        document.getElementById('btnLimpar').addEventListener('click', () => {
+            if (confirm('Apagar todo o histórico acumulado?')) {
+                dadosInventario = []; localStorage.removeItem('inventario_modal_etiqueta_sn');
+                atualizarTabela(); fecharModal();
             }
-        }
-
-        // Eventos dos botões
-        btnSalvar.addEventListener('click', cliqueBotaoManual);
-        btnBaixarCSV.addEventListener('click', baixarCSV);
-        btnBaixarTXT.addEventListener('click', baixarTXT);
-        btnLimpar.addEventListener('click', limparDados);
+        });
+        
+        // Inicializa cursor na Etiqueta
+        inputEtiqueta.focus();
     </script>
 </body>
 </html>
