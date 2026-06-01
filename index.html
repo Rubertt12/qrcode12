@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário Express - Cloud</title>
+    <title>Inventário Express - Secure Cloud</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     
     <style>
@@ -180,7 +180,7 @@
         .modal-header { font-size: 18px; font-weight: 600; color: #1d1d1f; margin-bottom: 14px; text-align: center; }
         .modal-resumo-etiqueta { background-color: #f5f5f7; padding: 10px; border-radius: 8px; font-size: 14px; text-align: left; margin-bottom: 16px; border: 1px dashed #d2d2d7; line-height: 1.5; }
 
-        /* Telas de Autenticação Gêmeas */
+        /* Telas de Autenticação */
         .auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #f5f5f7; display: flex; justify-content: center;
@@ -332,7 +332,6 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Configurações do seu projeto Firebase Real
         const firebaseConfig = {
             apiKey: "AIzaSyDGL2cstf5aadi_IB_3RdKBne7r74_jSCc",
             authDomain: "qrcode-f0a67.firebaseapp.com",
@@ -342,6 +341,7 @@
             appId: "1:205560170933:web:d4e46a2eb10bcce3f931fc"
         };
 
+        // Inicialização Única do Firebase (Sem duplicações)
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -371,11 +371,23 @@
         const btnExcluirItem = document.getElementById('btnExcluirItem');
         const btnFecharModalAcoes = document.getElementById('btnFecharModalAcoes');
         
-        // Elementos de Telas Auth
         const telaLogin = document.getElementById('telaLogin');
         const telaCadastro = document.getElementById('telaCadastro');
 
-        // Alternância de Telas (Login / Cadastro)
+        // --- FUNÇÃO DE SEGURANÇA: ANTI-XSS (Sanitização) ---
+        function escaparHTML(string) {
+            const mapa = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#x27;',
+                '/': '&#x2F;'
+            };
+            return String(string).replace(/[&<>"'/]/g, m => mapa[m]);
+        }
+
+        // Alternância de Telas
         document.getElementById('linkIrParaCadastro').addEventListener('click', () => {
             telaLogin.classList.add('hidden');
             telaCadastro.classList.remove('hidden');
@@ -387,19 +399,18 @@
 
         // --- LÓGICA DE AUTENTICAÇÃO ---
 
-        // 1. Logar com E-mail
         document.getElementById('btnLogar').addEventListener('click', async () => {
             const email = document.getElementById('loginEmail').value.trim();
             const senha = document.getElementById('loginSenha').value.trim();
             if(!email || !senha) { alert("Preencha todos os campos!"); return; }
             try {
+                dadosInventario = []; 
                 await signInWithEmailAndPassword(auth, email, senha);
             } catch (error) {
                 alert("Erro ao entrar: Verifique seu e-mail e senha.");
             }
         });
 
-        // 2. Cadastrar com E-mail
         document.getElementById('btnCadastrar').addEventListener('click', async () => {
             const email = document.getElementById('cadastroEmail').value.trim();
             const senha = document.getElementById('cadastroSenha').value.trim();
@@ -410,6 +421,7 @@
             if(senha !== senhaConfirma) { alert("As senhas não coincidem!"); return; }
 
             try {
+                dadosInventario = []; 
                 await createUserWithEmailAndPassword(auth, email, senha);
                 alert("Conta criada com sucesso!");
             } catch (error) {
@@ -421,9 +433,9 @@
             }
         });
 
-        // 3. Login / Cadastro com Google
         async function autenticarComGoogle() {
             try {
+                dadosInventario = []; 
                 await signInWithPopup(auth, googleProvider);
             } catch (error) {
                 alert("Falha na autenticação com o Google: " + error.message);
@@ -432,13 +444,13 @@
         document.getElementById('btnGoogleLogin').addEventListener('click', autenticarComGoogle);
         document.getElementById('btnGoogleCadastro').addEventListener('click', autenticarComGoogle);
 
-        // 4. Logout
-        document.getElementById('btnSair').addEventListener('click', () => {
-            signOut(auth);
+        document.getElementById('btnSair').addEventListener('click', async () => {
+            dadosInventario = [];
+            atualizarTabela();
+            await signOut(auth);
             window.location.reload();
         });
 
-        // Observador do Estado do Usuário
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 usuarioAtual = user;
@@ -446,24 +458,33 @@
                 telaLogin.classList.add('hidden');
                 telaCadastro.classList.add('hidden');
                 await puxarDadosNuvem();
-                inputEtiqueta.focus();
+                setTimeout(() => { inputEtiqueta.focus(); }, 300);
             } else {
+                usuarioAtual = null;
+                dadosInventario = [];
+                atualizarTabela();
                 telaLogin.classList.remove('hidden');
                 telaCadastro.classList.add('hidden');
             }
         });
 
-        // --- SISTEMA DE INVENTÁRIO (SINCRO CLOUD) ---
+        // --- OPERAÇÕES NO CLOUD FIRESTORE ---
         async function puxarDadosNuvem() {
             if (!usuarioAtual) return;
-            const docRef = doc(db, "inventarios", usuarioAtual.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                dadosInventario = docSnap.data().itens || [];
-            } else {
+            try {
+                const docRef = doc(db, "inventarios", usuarioAtual.uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    dadosInventario = docSnap.data().itens || [];
+                } else {
+                    dadosInventario = [];
+                }
+                atualizarTabela();
+            } catch (error) {
+                console.error("Erro ao puxar dados:", error);
                 dadosInventario = [];
+                atualizarTabela();
             }
-            atualizarTabela();
         }
 
         async function salvarDadosNuvem() {
@@ -472,7 +493,7 @@
             await setDoc(docRef, { itens: dadosInventario });
         }
 
-        // Scanner QR/Barcode
+        // --- SCANNER QR / BARCODE ---
         window.onScanSuccess = function(decodedText, decodedResult) {
             if (estaProcessandoLeitura || modalAberto || !usuarioAtual) return;
             estaProcessandoLeitura = true;
@@ -487,7 +508,7 @@
         }, false);
         html5QrcodeScanner.render(window.onScanSuccess, () => {});
 
-        // Processamentos Internos
+        // --- PROCESSAMENTOS DE DADOS ---
         window.processarEtiqueta = function() {
             const etiquetaVal = inputEtiqueta.value.trim().toUpperCase();
             if (!etiquetaVal) return;
@@ -525,9 +546,11 @@
             }
 
             if (modoEdicao && itemSelecionadoId) {
-                dadosInventario = dadosInventario.map(item => item.id === itemSelecionadoId ? { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal } : item);
+                dadosInventario = dadosInventario.map(item => item.id === itemSelecionadoId ? 
+                    { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, operador: usuarioAtual.email } : item);
             } else {
-                dadosInventario.push({ id: Date.now(), tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora });
+                // Rastreabilidade Avançada: Incluído o campo operador
+                dadosInventario.push({ id: Date.now(), tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora, operador: usuarioAtual.email });
             }
 
             await salvarDadosNuvem();
@@ -546,7 +569,15 @@
             const itemAlvo = dadosInventario.find(item => item.id === idItem);
             if (!itemAlvo) return;
             itemSelecionadoId = idItem; modalAberto = true;
-            resumoItemAlvo.innerHTML = `<strong>Ativo:</strong> ${itemAlvo.tipo}<br><strong>Patrimônio:</strong> ${itemAlvo.etiqueta}<br><strong>S/N:</strong> ${itemAlvo.sn}<br><strong>Setor:</strong> ${itemAlvo.setor}`;
+            
+            // Exibição do resumo tratando os dados contra injeções
+            resumoItemAlvo.innerHTML = `
+                <strong>Ativo:</strong> ${escaparHTML(itemAlvo.tipo)}<br>
+                <strong>Patrimônio:</strong> ${escaparHTML(itemAlvo.etiqueta)}<br>
+                <strong>S/N:</strong> ${escaparHTML(itemAlvo.sn)}<br>
+                <strong>Setor:</strong> ${escaparHTML(itemAlvo.setor)}<br>
+                <strong>Técnico:</strong> ${escaparHTML(itemAlvo.operador || 'Não Registrado')}`;
+            
             modalAcoesItem.classList.add('active');
         }
 
@@ -582,14 +613,21 @@
             }
         }
 
+        // Renderização limpa e Segura da Tabela
         function atualizarTabela() {
-            tabelaCorpo.innerHTML = '';
+            tabelaCorpo.innerHTML = ''; 
             totalItensSpan.textContent = dadosInventario.length;
+            
+            if (dadosInventario.length === 0) return;
+
             [...dadosInventario].reverse().forEach(item => {
                 const linha = document.createElement('tr');
+                // Sanitização em tempo de renderização contra brechas XSS
                 linha.innerHTML = `
-                    <td><strong>${item.tipo}</strong></td><td>${item.etiqueta}</td><td>${item.sn}</td>
-                    <td><span style="color: #5856d6; font-weight: 500;">${item.setor}</span></td>
+                    <td><strong>${escaparHTML(item.tipo)}</strong></td>
+                    <td>${escaparHTML(item.etiqueta)}</td>
+                    <td>${escaparHTML(item.sn)}</td>
+                    <td><span style="color: #5856d6; font-weight: 500;">${escaparHTML(item.setor)}</span></td>
                     <td class="col-acoes"><button class="btn-deletar-item" onclick="abrirModalAcoes(${item.id})">🗑️</button></td>`;
                 tabelaCorpo.appendChild(linha);
             });
@@ -600,7 +638,7 @@
             inputElement.classList.add('input-erro'); alert(message); inputElement.classList.remove('input-erro');
         }
 
-        // Listeners Locais
+        // Listeners Locais de Input
         inputEtiqueta.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.processarEtiqueta(); } });
         inputEtiqueta.addEventListener('change', () => { if (!modalAberto && inputEtiqueta.value.trim().length > 0) window.processarEtiqueta(); });
         inputSN.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inputSetor.focus(); } });
@@ -612,17 +650,18 @@
         btnEditarItem.addEventListener('click', iniciarEdicao);
         btnFecharModalAcoes.addEventListener('click', fecharModalAcoes);
         
+        // Exportações de Arquivos
         document.getElementById('btnBaixarCSV').addEventListener('click', () => {
             if (dadosInventario.length === 0) return;
-            let csv = "data:text/csv;charset=utf-8,\uFEFFTipo;Etiqueta;SN;Setor;Data\n";
-            dadosInventario.forEach(i => csv += `"${i.tipo}";"${i.etiqueta}";"${i.sn}";"${i.setor}";"${i.dataHora}"\n`);
+            let csv = "data:text/csv;charset=utf-8,\uFEFFTipo;Etiqueta;SN;Setor;Data;Operador\n";
+            dadosInventario.forEach(i => csv += `"${i.tipo}";"${i.etiqueta}";"${i.sn}";"${i.setor}";"${i.dataHora}";"${i.operador || ''}"\n`);
             dispararDownload(csv, 'inventario.csv');
         });
 
         document.getElementById('btnBaixarTXT').addEventListener('click', () => {
             if (dadosInventario.length === 0) return;
             let txt = "data:text/plain;charset=utf-8,\uFEFF";
-            dadosInventario.forEach(i => txt += `${i.tipo.padEnd(12)}| ${i.etiqueta.padEnd(15)}| ${i.sn.padEnd(25)}| ${i.setor}\n`);
+            dadosInventario.forEach(i => txt += `${i.tipo.padEnd(12)}| ${i.etiqueta.padEnd(15)}| ${i.sn.padEnd(25)}| ${i.setor.padEnd(15)}| ${i.operador || ''}\n`);
             dispararDownload(txt, 'inventario.txt');
         });
 
