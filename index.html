@@ -41,7 +41,7 @@
         }
 
         .user-info {
-            font-size: 12px;
+            font-size: 13px;
             color: #86868b;
             display: flex;
             align-items: center;
@@ -246,6 +246,10 @@
             <div class="divider">ou preencha os campos</div>
 
             <div class="form-group" style="text-align: left;">
+                <label>Nome do Usuário (Técnico):</label>
+                <input type="text" id="cadastroNome" placeholder="Ex: Rúbertt Ramires" style="text-transform: none;">
+            </div>
+            <div class="form-group" style="text-align: left;">
                 <label>E-mail Corporativo ou Pessoal:</label>
                 <input type="email" id="cadastroEmail" placeholder="nome@empresa.com">
             </div>
@@ -265,7 +269,7 @@
     <header>
         <h1>Coletor de Ativos</h1>
         <div class="user-info">
-            <span id="txtUserEmail">...</span>
+            <span id="txtUserEmail" style="font-weight: 600; color: #1d1d1f;">...</span>
             <button class="btn-logout" id="btnSair">Sair</button>
         </div>
     </header>
@@ -338,7 +342,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -350,7 +354,6 @@
             appId: "1:205560170933:web:d4e46a2eb10bcce3f931fc"
         };
 
-        // Correção do erro de redundância/duplicação na inicialização do Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -383,16 +386,9 @@
         const telaLogin = document.getElementById('telaLogin');
         const telaCadastro = document.getElementById('telaCadastro');
 
-        // FUNÇÃO DE SEGURANÇA: ANTI-XSS (Sanitização)
+        // FUNÇÃO DE SEGURANÇA: ANTI-XSS
         function escaparHTML(string) {
-            const mapa = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#x27;',
-                '/': '&#x2F;'
-            };
+            const mapa = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;', '/': '&#x2F;' };
             return String(string).replace(/[&<>"'/]/g, m => mapa[m]);
         }
 
@@ -420,18 +416,24 @@
         });
 
         document.getElementById('btnCadastrar').addEventListener('click', async () => {
+            const nome = document.getElementById('cadastroNome').value.trim();
             const email = document.getElementById('cadastroEmail').value.trim();
             const senha = document.getElementById('cadastroSenha').value.trim();
             const senhaConfirma = document.getElementById('cadastroSenhaConfirma').value.trim();
 
-            if(!email || !senha || !senhaConfirma) { alert("Preencha todos os campos!"); return; }
+            if(!nome || !email || !senha || !senhaConfirma) { alert("Preencha todos os campos!"); return; }
             if(senha.length < 6) { alert("A senha precisa ter no mínimo 6 dígitos!"); return; }
             if(senha !== senhaConfirma) { alert("As senhas não coincidem!"); return; }
 
             try {
                 dadosInventario = []; 
-                await createUserWithEmailAndPassword(auth, email, senha);
+                const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+                
+                // Grava o Nome do Usuário no Perfil do Firebase Auth
+                await updateProfile(userCredential.user, { displayName: nome });
+                
                 alert("Conta criada com sucesso!");
+                window.location.reload(); // Recarrega para fixar as novas credenciais
             } catch (error) {
                 if(error.code === 'auth/email-already-in-use') {
                     alert("Este e-mail já está cadastrado.");
@@ -462,11 +464,12 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 usuarioAtual = user;
-                document.getElementById('txtUserEmail').textContent = user.email;
+                // Exibe o Nome de Usuário se houver, senhas cai no e-mail como fallback
+                document.getElementById('txtUserEmail').textContent = user.displayName || user.email;
                 telaLogin.classList.add('hidden');
                 telaCadastro.classList.add('hidden');
                 await puxarDadosNuvem();
-                体积out(() => { inputEtiqueta.focus(); }, 300);
+                setTimeout(() => { inputEtiqueta.focus(); }, 300);
             } else {
                 usuarioAtual = null;
                 dadosInventario = [];
@@ -553,11 +556,14 @@
                 return;
             }
 
+            // Define o Nome do Operador baseado no displayName ou e-mail
+            const nomeOperador = usuarioAtual.displayName || usuarioAtual.email;
+
             if (modoEdicao && itemSelecionadoId) {
                 dadosInventario = dadosInventario.map(item => item.id === itemSelecionadoId ? 
-                    { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, operador: usuarioAtual.email } : item);
+                    { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, operador: nomeOperador } : item);
             } else {
-                dadosInventario.push({ id: Date.now(), tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora, operador: usuarioAtual.email });
+                dadosInventario.push({ id: Date.now(), tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora, operador: nomeOperador });
             }
 
             await salvarDadosNuvem();
@@ -653,40 +659,41 @@
         btnEditarItem.addEventListener('click', iniciarEdicao);
         btnFecharModalAcoes.addEventListener('click', fecharModalAcoes);
         
-        // EXPORTAÇÕES CORRIGIDAS (Sincronizadas com o e-mail do Firebase Auth)
+        // EXPORTAÇÃO CSV ATUALIZADA (Usando Nome do Usuário)
         document.getElementById('btnBaixarCSV').addEventListener('click', () => {
             if (dadosInventario.length === 0) return;
-            const emailOperador = usuarioAtual ? usuarioAtual.email : "DESCONHECIDO";
+            const nomePadrao = usuarioAtual ? (usuarioAtual.displayName || usuarioAtual.email) : "DESCONHECIDO";
             let csv = "data:text/csv;charset=utf-8,\uFEFFTipo;Etiqueta;SN;Setor;Data;Operador\n";
             dadosInventario.forEach(i => {
-                const op = i.operador || emailOperador;
+                const op = i.operador || nomePadrao;
                 csv += `"${i.tipo}";"${i.etiqueta}";"${i.sn}";"${i.setor}";"${i.dataHora}";"${op}"\n`;
             });
             dispararDownload(csv, 'inventario.csv');
         });
 
+        // EXPORTAÇÃO TXT ATUALIZADA (Usando Nome do Usuário e Visual Alinhado)
         document.getElementById('btnBaixarTXT').addEventListener('click', () => {
             if (dadosInventario.length === 0) return;
-            const emailOperador = usuarioAtual ? usuarioAtual.email : "DESCONHECIDO";
+            const nomePadrao = usuarioAtual ? (usuarioAtual.displayName || usuarioAtual.email) : "DESCONHECIDO";
             
             let txt = "data:text/plain;charset=utf-8,\uFEFF";
-            txt += "===================================================================\n";
-            txt += "                     RELATÓRIO DE ATIVOS COLETADOS                 \n";
+            txt += "===========================================================================================\n";
+            txt += "                               RELATÓRIO DE ATIVOS COLETADOS                               \n";
             txt += ` Gerado em: ${new Date().toLocaleString('pt-BR')}\n`;
-            txt += "===================================================================\n\n";
+            txt += "===========================================================================================\n\n";
             
-            // Cabeçalho das colunas tabuladas
-            txt += `${"TIPO".padEnd(12)} | ${"PATRIMÔNIO".padEnd(15)} | ${"NÚMERO DE SÉRIE (S/N)".padEnd(22)} | ${"SETOR".padEnd(15)} | TÉCNICO\n`;
-            txt += "----------------------------------------------------------------------------------------------------\n";
+            // Cabeçalho estruturado das colunas
+            txt += `${"TIPO".padEnd(12)} | ${"PATRIMÔNIO".padEnd(15)} | ${"NÚMERO DE SÉRIE (S/N)".padEnd(24)} | ${"SETOR".padEnd(15)} | TÉCNICO\n`;
+            txt += "-------------------------------------------------------------------------------------------\n";
             
             dadosInventario.forEach(i => {
-                const op = i.operador || emailOperador;
-                txt += `${i.tipo.padEnd(12)} | ${i.etiqueta.padEnd(15)} | ${i.sn.padEnd(22)} | ${i.setor.padEnd(15)} | ${op}\n`;
+                const op = i.operador || nomePadrao;
+                txt += `${i.tipo.padEnd(12)} | ${i.etiqueta.padEnd(15)} | ${i.sn.padEnd(24)} | ${i.setor.padEnd(15)} | ${op}\n`;
             });
             
-            txt += "----------------------------------------------------------------------------------------------------\n";
+            txt += "-------------------------------------------------------------------------------------------\n";
             txt += ` Total de itens no arquivo: ${dadosInventario.length}\n`;
-            txt += "===================================================================\n";
+            txt += "===========================================================================================\n";
             
             dispararDownload(txt, 'inventario.txt');
         });
