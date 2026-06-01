@@ -100,6 +100,11 @@
             background-color: #f0f7ff;
         }
 
+        .input-foco-laranja {
+            border: 2px solid #ff9500 !important;
+            background-color: #fffaf2;
+        }
+
         .input-sucesso {
             background-color: #e8f5e9 !important;
             border-color: #34c759 !important;
@@ -217,7 +222,7 @@
             <input type="text" id="inputEtiqueta" placeholder="Aguardando Serial...">
         </div>
 
-        <button class="btn btn-success" id="btnSalvar">Avançar / Salvar Item</button>
+        <button class="btn btn-success" id="btnSalvar">Avançar / Salvar Manual</button>
     </div>
 
     <div class="table-container">
@@ -244,7 +249,7 @@
     <script>
         let dadosInventario = [];
         let estaProcessandoLeitura = false;
-        let passoAtual = "SN"; // Pode ser "SN" ou "ETIQUETA"
+        let passoAtual = "SN";
 
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const inputSN = document.getElementById('inputSN');
@@ -276,7 +281,6 @@
                 processarPassoEtiqueta();
             }
 
-            // Delay para tirar o celular de cima da etiqueta e não ler repetido na sequência imediata
             setTimeout(() => {
                 estaProcessandoLeitura = false;
             }, 1500);
@@ -286,7 +290,7 @@
             // Ignora varreduras sem foco
         }
 
-        // Inicializa o Scanner otimizado para barras de hardware
+        // Inicializa o Scanner
         let html5QrcodeScanner = new Html5QrcodeScanner(
             "reader", 
             { 
@@ -315,7 +319,7 @@
             const snVal = inputSN.value.trim();
             if (!snVal) return;
 
-            // Valida duplicidade de S/N no histórico
+            // Valida duplicidade de S/N
             const snExiste = dadosInventario.some(item => item.sn === snVal);
             if (snExiste) {
                 emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado!`);
@@ -323,16 +327,19 @@
                 return;
             }
 
-            // Avança para o passo da Etiqueta
+            // Transição automática para o Passo 2
             if (navigator.vibrate) navigator.vibrate(100);
             passoAtual = "ETIQUETA";
             
-            // Muda os focos visuais na tela do celular
             textoInstrucao.textContent = "PASSO 2: Leia ou digite a ETIQUETA (Patrimônio)";
             textoInstrucao.classList.add('etiqueta-foco');
+            
             inputSN.classList.remove('input-foco');
-            inputEtiqueta.classList.add('input-foco');
+            inputEtiqueta.classList.add('input-foco-laranja');
             inputEtiqueta.placeholder = "Bipe ou digite a Etiqueta...";
+            
+            // Coloca o cursor piscando no segundo campo de forma nativa
+            inputEtiqueta.focus();
         }
 
         // Lógica do Passo 2: Etiqueta e finalização do cadastro
@@ -350,7 +357,7 @@
 
             if (!etiquetaVal) return;
 
-            // Valida duplicidade da Etiqueta no histórico
+            // Valida duplicidade da Etiqueta
             const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
             if (etiquetaExiste) {
                 emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada!`);
@@ -358,7 +365,7 @@
                 return;
             }
 
-            // Sucesso total: Salva o registro completo
+            // Sucesso total
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             
             dadosInventario.push({ tipo, sn: snVal, etiqueta: etiquetaVal, dataHora });
@@ -368,7 +375,41 @@
             resetarFluxo();
         }
 
-        // Botão manual de ação (funciona tanto para avançar o SN quanto para salvar a etiqueta)
+        // ==========================================
+        // NOVO: DETECÇÃO AUTOMÁTICA DE DIGITAÇÃO MANUAL
+        // ==========================================
+        
+        // Se o usuário apertar "Enter"/"Ir" no teclado do celular enquanto digita o S/N
+        inputSN.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Impede recarregar a página
+                processarPassoSN();
+            }
+        });
+
+        // Se o usuário simplesmente mudar de campo ou clicar fora após digitar o S/N
+        inputSN.addEventListener('change', function() {
+            if (passoAtual === "SN" && inputSN.value.trim().length > 0) {
+                processarPassoSN();
+            }
+        });
+
+        // Se o usuário apertar "Enter"/"Ir" no teclado do celular enquanto digita a Etiqueta
+        inputEtiqueta.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                processarPassoEtiqueta();
+            }
+        });
+
+        // Se o usuário simplesmente mudar de campo ou clicar fora após digitar a Etiqueta
+        inputEtiqueta.addEventListener('change', function() {
+            if (passoAtual === "ETIQUETA" && inputEtiqueta.value.trim().length > 0) {
+                processarPassoEtiqueta();
+            }
+        });
+        // ==========================================
+
         function cliqueBotaoManual() {
             if (passoAtual === "SN") {
                 processarPassoSN();
@@ -377,7 +418,6 @@
             }
         }
 
-        // Reseta o formulário voltando para o Passo 1
         function resetarFluxo() {
             passoAtual = "SN";
             textoInstrucao.textContent = "PASSO 1: Leia ou digite o S/N (Serial)";
@@ -387,11 +427,13 @@
             inputEtiqueta.value = '';
             inputEtiqueta.placeholder = "Aguardando Serial...";
             
-            inputEtiqueta.classList.remove('input-foco');
-            inputSN.classList.add('input-foco');
+            inputEtiqueta.classList.remove('input-foco-laranja');
+            inputSN.add('input-foco');
+            
+            // Devolve o cursor piscando pro primeiro campo automaticamente
+            inputSN.focus();
         }
 
-        // Emite alerta visual e sonoro de erro
         function emitirErro(inputElement, mensagem) {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             inputElement.classList.add('input-erro');
