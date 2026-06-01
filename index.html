@@ -76,6 +76,18 @@
             font-size: 16px;
             background-color: #fff;
             -webkit-appearance: none;
+            transition: all 0.2s ease;
+        }
+
+        /* Estados de feedback visual para o input */
+        .input-sucesso {
+            background-color: #e8f5e9 !important;
+            border-color: #34c759 !important;
+        }
+
+        .input-erro {
+            background-color: #ffebee !important;
+            border-color: #ff3b30 !important;
         }
 
         /* Botões */
@@ -164,10 +176,10 @@
 
         <div class="form-group">
             <label for="codigoManual">Código Lido:</label>
-            <input type="text" id="codigoManual" placeholder="Aguardando leitura do código...">
+            <input type="text" id="codigoManual" placeholder="Aguardando leitura do código..." readonly>
         </div>
 
-        <button class="btn btn-success" id="btnSalvar">Salvar Item Manual</button>
+        <button class="btn btn-success" id="btnSalvar" style="display: none;">Salvar Item Manual</button>
     </div>
 
     <div class="table-container">
@@ -190,10 +202,9 @@
     </div>
 
     <script>
-        // Array de dados na memória do app
         let dadosInventario = [];
+        let estaProcessandoLeitura = false; // Flag para evitar leituras múltiplas no mesmo milessegundo
 
-        // Elementos do DOM
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const codigoManualInput = document.getElementById('codigoManual');
         const btnSalvar = document.getElementById('btnSalvar');
@@ -202,41 +213,45 @@
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
 
-        // Recupera dados salvos para evitar perdas caso a página atualize
+        // Carrega dados do LocalStorage se houver
         if (localStorage.getItem('inventario_ativos')) {
             dadosInventario = JSON.parse(localStorage.getItem('inventario_ativos'));
             atualizarTabela();
         }
 
-        // Função executada quando um código é lido com sucesso
+        // Função executada no sucesso da leitura
         function onScanSuccess(decodedText, decodedResult) {
-            // Vibração rápida para feedback tátil de leitura (se o celular suportar)
-            if (navigator.vibrate) navigator.vibrate(100);
+            // Se já estiver processando uma leitura ou a janela de alerta estiver aberta, ignora frames extras
+            if (estaProcessandoLeitura) return;
             
+            estaProcessandoLeitura = true;
             codigoManualInput.value = decodedText;
             
-            // Salva de forma automática e imediata para agilizar o processo físico
+            // Dispara a função de salvar e validação
             salvarItem();
+            
+            // Pequeno delay para liberar a câmera para o próximo código físico diferente
+            setTimeout(() => {
+                estaProcessandoLeitura = false;
+            }, 1500);
         }
 
         function onScanFailure(error) {
-            // Falhas de varredura por frame são normais na busca por foco, ignoradas por performance.
+            // Ignora falhas de foco contínuas da câmera
         }
 
-        // Configuração otimizada para câmeras de celular e códigos de barras horizontais alongados
+        // Configuração do Scanner de câmera traseira
         let html5QrcodeScanner = new Html5QrcodeScanner(
             "reader", 
             { 
-                fps: 20, 
+                fps: 25, 
                 qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    // Caixa retangular (larga e mais baixa) perfeita para focar etiquetas de número de série
                     return {
                         width: Math.floor(viewfinderWidth * 0.85),
                         height: Math.floor(viewfinderHeight * 0.35)
                     };
                 },
                 rememberLastUsedCamera: true,
-                // Ativa os principais formatos usados em tags de hardware corporativo
                 formatsToSupport: [ 
                     Html5QrcodeSupportedFormats.QR_CODE,
                     Html5QrcodeSupportedFormats.CODE_128,
@@ -249,36 +264,56 @@
         );
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-        // Função para persistir o item coletado
+        // Salva o item aplicando a regra de não duplicidade
         function salvarItem() {
             const codigo = codigoManualInput.value.trim();
             const tipo = tipoAtivoSelect.value;
             const dataHora = new Date().toLocaleString('pt-BR');
 
             if (!codigo) {
-                alert('Nenhum código detectado ou digitado.');
                 return;
             }
 
-            // Insere no início ou fim da lista
+            // REGRA PRINCIPAL: Verifica se o código já existe no array de inventário
+            const codigoJaExiste = dadosInventario.some(item => item.codigo === codigo);
+
+            if (codigoJaExiste) {
+                // Feedback tátil de erro (vibra 2 vezes rápido se o celular suportar)
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                
+                // Feedback visual de erro
+                codigoManualInput.classList.add('input-erro');
+                codigoManualInput.value = `DUPLICADO: ${codigo}`;
+                
+                alert(`Atenção!\nO código [ ${codigo} ] já foi lido anteriormente neste inventário.`);
+                
+                // Reseta o campo após fechar o alerta
+                codigoManualInput.classList.remove('input-erro');
+                codigoManualInput.value = '';
+                return;
+            }
+
+            // Se for um código novo, prossegue e adiciona
+            if (navigator.vibrate) navigator.vibrate(100); // Vibra 1x para sucesso
+            
+            codigoManualInput.classList.add('input-sucesso');
+            
             dadosInventario.push({ tipo, codigo, dataHora });
-
-            // Atualiza o backup local offline
             localStorage.setItem('inventario_ativos', JSON.stringify(dadosInventario));
-
-            // Atualiza a interface
+            
             atualizarTabela();
 
-            // Reseta o input de texto para a próxima leitura
-            codigoManualInput.value = '';
+            // Remove o efeito verde após 1 segundo e limpa o input para o próximo hardware
+            setTimeout(() => {
+                codigoManualInput.classList.remove('input-sucesso');
+                codigoManualInput.value = '';
+            }, 1000);
         }
 
-        // Atualiza a visualização dos dados na tabela
         function atualizarTabela() {
             tabelaCorpo.innerHTML = '';
             totalItensSpan.textContent = dadosInventario.length;
 
-            // Inverte a ordem apenas visualmente para mostrar o último lido no topo
             [...dadosInventario].reverse().forEach(item => {
                 const linha = document.createElement('tr');
                 linha.innerHTML = `
@@ -289,14 +324,12 @@
             });
         }
 
-        // Gera e faz download do arquivo CSV
         function baixarCSV() {
             if (dadosInventario.length === 0) {
                 alert('Não há dados para exportar.');
                 return;
             }
 
-            // Garante compatibilidade de acentos no Excel (\uFEFF) e usa ';' como separador de colunas padrão brasileiro
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += "Tipo de Ativo;Codigo de Barras / Serial;Data e Hora\n";
 
@@ -308,7 +341,6 @@
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             
-            // Gera o nome baseado no dia atual
             const dataDoArquivo = new Date().toISOString().slice(0, 10);
             link.setAttribute("download", `inventario_${dataDoArquivo}.csv`);
             
@@ -317,16 +349,15 @@
             document.body.removeChild(link);
         }
 
-        // Limpa a tabela e o armazenamento local
         function limparDados() {
             if (confirm('Deseja apagar permanentemente todos os registros coletados da tela?')) {
                 dadosInventario = [];
                 localStorage.removeItem('inventario_ativos');
                 atualizarTabela();
+                codigoManualInput.value = '';
             }
         }
 
-        // Listeners de gatilhos
         btnSalvar.addEventListener('click', salvarItem);
         btnBaixar.addEventListener('click', baixarCSV);
         btnLimpar.addEventListener('click', limparDados);
