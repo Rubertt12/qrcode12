@@ -118,6 +118,19 @@
         .btn-primary { background-color: #0071e3; color: white; }
         .btn-secondary { background-color: #86868b; color: white; }
         .btn-danger { background-color: #ff3b30; color: white; }
+        
+        .btn-google {
+            background-color: #ffffff;
+            color: #3c4043;
+            border: 1px solid #d2d2d7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .btn-google:hover { background-color: #f8f9fa; }
+        .btn-google img { width: 18px; height: 18px; }
 
         .btn-deletar-item {
             background: none;
@@ -167,32 +180,76 @@
         .modal-header { font-size: 18px; font-weight: 600; color: #1d1d1f; margin-bottom: 14px; text-align: center; }
         .modal-resumo-etiqueta { background-color: #f5f5f7; padding: 10px; border-radius: 8px; font-size: 14px; text-align: left; margin-bottom: 16px; border: 1px dashed #d2d2d7; line-height: 1.5; }
 
-        /* Tela de Login Dedicada */
-        #telaLogin {
+        /* Telas de Autenticação Gêmeas */
+        .auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #f5f5f7; display: flex; justify-content: center;
-            align-items: center; z-index: 10000; transition: all 0.3s ease;
+            align-items: center; z-index: 10000; transition: all 0.2s ease;
         }
-        #telaLogin.hidden { opacity: 0; pointer-events: none; }
-        .login-box { width: 90%; max-width: 380px; background: #fff; padding: 24px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); text-align: center; }
-        .login-box input { text-transform: none; margin-bottom: 12px; }
+        .auth-overlay.hidden { display: none; }
+        .auth-box { width: 90%; max-width: 380px; background: #fff; padding: 24px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); text-align: center; }
+        .auth-box input { text-transform: none; margin-bottom: 4px; }
+        .auth-link { margin-top: 16px; font-size: 14px; color: #0071e3; cursor: pointer; display: inline-block; }
+        .auth-link:hover { text-decoration: underline; }
+        .divider { display: flex; align-items: center; text-align: center; color: #86868b; font-size: 12px; margin: 16px 0; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #d2d2d7; }
+        .divider:not(:empty)::before { margin-right: .25em; }
+        .divider:not(:empty)::after { margin-left: .25em; }
     </style>
 </head>
 <body>
 
-    <div id="telaLogin">
-        <div class="login-box">
-            <h2 style="margin-bottom: 8px; font-weight: 600;">Inventário Express</h2>
+    <div id="telaLogin" class="auth-overlay">
+        <div class="auth-box">
+            <h2 style="margin-bottom: 4px; font-weight: 600;">Inventário Express</h2>
             <p style="font-size: 14px; color:#86868b; margin-bottom: 20px;">Faça login para sincronizar seus ativos</p>
+            
+            <button class="btn btn-google" id="btnGoogleLogin">
+                <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/web-24dp/copy_0/96dp.png" alt="Google">
+                Entrar com o Google
+            </button>
+
+            <div class="divider">ou use seu e-mail</div>
+
             <div class="form-group" style="text-align: left;">
                 <label>E-mail:</label>
                 <input type="email" id="loginEmail" placeholder="seuemail@empresa.com">
             </div>
-            <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+            <div class="form-group" style="text-align: left; margin-bottom: 12px;">
                 <label>Senha:</label>
                 <input type="password" id="loginSenha" placeholder="••••••••">
             </div>
-            <button class="btn btn-primary" id="btnLogar" style="margin-top: 0;">Entrar</button>
+            <button class="btn btn-primary" id="btnLogar" style="margin-top: 4px;">Entrar</button>
+            <div class="auth-link" id="linkIrParaCadastro">Não tem conta? Cadastre-se aqui</div>
+        </div>
+    </div>
+
+    <div id="telaCadastro" class="auth-overlay hidden">
+        <div class="auth-box">
+            <h2 style="margin-bottom: 4px; font-weight: 600;">Criar Conta</h2>
+            <p style="font-size: 14px; color:#86868b; margin-bottom: 20px;">Crie seu acesso para salvar na nuvem</p>
+            
+            <button class="btn btn-google" id="btnGoogleCadastro">
+                <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/web-24dp/copy_0/96dp.png" alt="Google">
+                Cadastrar com o Google
+            </button>
+
+            <div class="divider">ou preencha os campos</div>
+
+            <div class="form-group" style="text-align: left;">
+                <label>E-mail Corporativo ou Pessoal:</label>
+                <input type="email" id="cadastroEmail" placeholder="nome@empresa.com">
+            </div>
+            <div class="form-group" style="text-align: left;">
+                <label>Escolha uma Senha (mínimo 6 dígitos):</label>
+                <input type="password" id="cadastroSenha" placeholder="••••••••">
+            </div>
+            <div class="form-group" style="text-align: left; margin-bottom: 12px;">
+                <label>Confirme a Senha:</label>
+                <input type="password" id="cadastroSenhaConfirma" placeholder="••••••••">
+            </div>
+            <button class="btn btn-success" id="btnCadastrar" style="margin-top: 4px;">Finalizar Cadastro</button>
+            <div class="auth-link" id="linkIrParaLogin">Já tem uma conta? Faça Login</div>
         </div>
     </div>
 
@@ -272,22 +329,23 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // ⚠️ INSIRA AS CONFIGURAÇÕES DO SEU PROJETO FIREBASE AQUI:
         const firebaseConfig = {
-         apiKey: "AIzaSyDGL2cstf5aadi_IB_3RdKBne7r74_jSCc",
-    authDomain: "qrcode-f0a67.firebaseapp.com",
-    projectId: "qrcode-f0a67",
-    storageBucket: "qrcode-f0a67.firebasestorage.app",
-    messagingSenderId: "205560170933",
-    appId: "1:205560170933:web:d4e46a2eb10bcce3f931fc"
-  };
+            apiKey: "COLE_AQUI_SUA_API_KEY",
+            authDomain: "COLE_AQUI_SEU_AUTH_DOMAIN",
+            projectId: "COLE_AQUI_SEU_PROJECT_ID",
+            storageBucket: "COLE_AQUI_SEU_STORAGE_BUCKET",
+            messagingSenderId: "COLE_AQUI_SEU_MESSAGING_SENDER_ID",
+            appId: "COLE_AQUI_SEU_APP_ID"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
 
         let dadosInventario = [];
         let estaProcessandoLeitura = false;
@@ -312,36 +370,90 @@
         const btnEditarItem = document.getElementById('btnEditarItem');
         const btnExcluirItem = document.getElementById('btnExcluirItem');
         const btnFecharModalAcoes = document.getElementById('btnFecharModalAcoes');
+        
+        // Elementos de Telas Auth
+        const telaLogin = document.getElementById('telaLogin');
+        const telaCadastro = document.getElementById('telaCadastro');
 
-        // Lógica de Autenticação Real
+        // Alternância de Telas (Login / Cadastro)
+        document.getElementById('linkIrParaCadastro').addEventListener('click', () => {
+            telaLogin.classList.add('hidden');
+            telaCadastro.classList.remove('hidden');
+        });
+        document.getElementById('linkIrParaLogin').addEventListener('click', () => {
+            telaCadastro.classList.add('hidden');
+            telaLogin.classList.remove('hidden');
+        });
+
+        // --- LÓGICA DE AUTENTICAÇÃO ---
+
+        // 1. Logar com E-mail
         document.getElementById('btnLogar').addEventListener('click', async () => {
             const email = document.getElementById('loginEmail').value.trim();
             const senha = document.getElementById('loginSenha').value.trim();
+            if(!email || !senha) { alert("Preencha todos os campos!"); return; }
             try {
                 await signInWithEmailAndPassword(auth, email, senha);
             } catch (error) {
-                alert("Erro ao entrar: Verifique as credenciais.");
+                alert("Erro ao entrar: Verifique seu e-mail e senha.");
             }
         });
 
+        // 2. Cadastrar com E-mail
+        document.getElementById('btnCadastrar').addEventListener('click', async () => {
+            const email = document.getElementById('cadastroEmail').value.trim();
+            const senha = document.getElementById('cadastroSenha').value.trim();
+            const senhaConfirma = document.getElementById('cadastroSenhaConfirma').value.trim();
+
+            if(!email || !senha || !senhaConfirma) { alert("Preencha todos os campos!"); return; }
+            if(senha.length < 6) { alert("A senha precisa ter no mínimo 6 dígitos!"); return; }
+            if(senha !== senhaConfirma) { alert("As senhas não coincidem!"); return; }
+
+            try {
+                await createUserWithEmailAndPassword(auth, email, senha);
+                alert("Conta criada com sucesso!");
+            } catch (error) {
+                if(error.code === 'auth/email-already-in-use') {
+                    alert("Este e-mail já está cadastrado.");
+                } else {
+                    alert("Erro ao criar conta: " + error.message);
+                }
+            }
+        });
+
+        // 3. Login / Cadastro com Google
+        async function autenticarComGoogle() {
+            try {
+                await signInWithPopup(auth, googleProvider);
+            } catch (error) {
+                alert("Falha na autenticação com o Google: " + error.message);
+            }
+        }
+        document.getElementById('btnGoogleLogin').addEventListener('click', autenticarComGoogle);
+        document.getElementById('btnGoogleCadastro').addEventListener('click', autenticarComGoogle);
+
+        // 4. Logout
         document.getElementById('btnSair').addEventListener('click', () => {
             signOut(auth);
             window.location.reload();
         });
 
+        // Observador do Estado do Usuário
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 usuarioAtual = user;
                 document.getElementById('txtUserEmail').textContent = user.email;
-                document.getElementById('telaLogin').classList.add('hidden');
+                telaLogin.classList.add('hidden');
+                telaCadastro.classList.add('hidden');
                 await puxarDadosNuvem();
                 inputEtiqueta.focus();
             } else {
-                document.getElementById('telaLogin').classList.remove('hidden');
+                telaLogin.classList.remove('hidden');
+                telaCadastro.classList.add('hidden');
             }
         });
 
-        // Sincronização Cloud (Firestore)
+        // --- SISTEMA DE INVENTÁRIO (SINCRO CLOUD) ---
         async function puxarDadosNuvem() {
             if (!usuarioAtual) return;
             const docRef = doc(db, "inventarios", usuarioAtual.uid);
