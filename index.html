@@ -76,7 +76,7 @@
             font-size: 16px;
             background-color: #fff;
             transition: all 0.2s ease;
-            text-transform:uppercase;
+            text-transform: uppercase; /* Força CapsLock Visual */
         }
 
         .input-foco-azul {
@@ -126,7 +126,6 @@
             font-weight: 600;
             margin-bottom: 8px;
             color: #0071e3;
-            text-transform:uppercase;
         }
 
         .table-container {
@@ -152,7 +151,6 @@
             padding: 8px;
             border-bottom: 1px solid #e5e5ea;
             vertical-align: middle;
-            text-transform:uppercase;
         }
 
         th { color: #86868b; font-weight: 500; }
@@ -286,8 +284,9 @@
         let estaProcessandoLeitura = false;
         let modalAberto = false;
         let itemSelecionadoId = null;
-        let modoEdicao = false; // Nova flag para controlar se estamos editando um arquivo existente
+        let modoEdicao = false;
 
+        // Declaração correta dos elementos do DOM
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const inputEtiqueta = document.getElementById('inputEtiqueta');
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
@@ -308,11 +307,13 @@
         const btnExcluirItem = document.getElementById('btnExcluirItem');
         const btnFecharModalAcoes = document.getElementById('btnFecharModalAcoes');
 
+        // Carrega o Banco Local
         if (localStorage.getItem('inventario_modal_etiqueta_sn_setor')) {
             dadosInventario = JSON.parse(localStorage.getItem('inventario_modal_etiqueta_sn_setor'));
             atualizarTabela();
         }
 
+        // Funções do Scanner QR/Barcode
         function onScanSuccess(decodedText, decodedResult) {
             if (estaProcessandoLeitura || modalAberto) return;
             estaProcessandoLeitura = true;
@@ -337,11 +338,11 @@
         }, false);
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
+        // Processamento de Entrada
         function processarEtiqueta() {
-            const etiquetaVal = inputEtiqueta.value.trim();
+            const etiquetaVal = inputEtiqueta.value.trim().toUpperCase(); // Persistência CapsLock
             if (!etiquetaVal) return;
 
-            // Se NÃO for modo de edição, barra etiquetas duplicadas na lista ativa
             if (!modoEdicao) {
                 const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
                 if (etiquetaExiste) {
@@ -361,10 +362,10 @@
         }
 
         function finalizarSalvarItem() {
-            const etiquetaVal = inputEtiqueta.value.trim();
-            const snVal = inputSN.value.trim();
-            const setorVal = inputSetor.value.trim() || "Não Informado";
-            const tipo = tipoAtivoSelect.value;
+            const etiquetaVal = inputEtiqueta.value.trim().toUpperCase(); // Persistência CapsLock
+            const snVal = inputSN.value.trim().toUpperCase();             // Persistência CapsLock
+            const setorVal = inputSetor.value.trim().toUpperCase() || "NÃO INFORMADO"; // Persistência CapsLock
+            const tipo = tipoAtivoSelect.value.toUpperCase();
             const dataHora = new Date().toLocaleString('pt-BR');
 
             if (!etiquetaVal) { fecharModal(); return; }
@@ -373,7 +374,6 @@
                 return;
             }
 
-            // Se for nova inclusão ou se mudou o S/N, valida se já existe em OUTRO item
             const snExiste = dadosInventario.some(item => item.sn === snVal && item.id !== itemSelecionadoId);
             if (snExiste) {
                 emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado em outro ativo!`);
@@ -384,7 +384,6 @@
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             
             if (modoEdicao && itemSelecionadoId) {
-                // Modo Edição: Localiza e substitui os dados direto no mesmo ID sem sumir antes
                 dadosInventario = dadosInventario.map(item => {
                     if (item.id === itemSelecionadoId) {
                         return { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal };
@@ -392,7 +391,6 @@
                     return item;
                 });
             } else {
-                // Modo Inclusão comum
                 const idUnico = Date.now();
                 dadosInventario.push({ id: idUnico, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora });
             }
@@ -404,7 +402,7 @@
 
         function fecharModal() {
             modalAberto = false;
-            modoEdicao = false; // Desliga a flag de edição ao fechar
+            modoEdicao = false;
             itemSelecionadoId = null; 
             modalPasso2.classList.remove('active');
             inputEtiqueta.value = '';
@@ -424,16 +422,14 @@
                 <strong>Ativo:</strong> ${itemAlvo.tipo}<br>
                 <strong>Patrimônio:</strong> ${itemAlvo.etiqueta}<br>
                 <strong>S/N:</strong> ${itemAlvo.sn}<br>
-                <strong>Setor:</strong> ${itemAlvo.setor || "Não Informado"}
+                <strong>Setor:</strong> ${itemAlvo.setor}
             `;
 
             modalAcoesItem.classList.add('active');
         }
 
         function fecharModalAcoes() {
-            if (!modoEdicao) {
-                itemSelecionadoId = null;
-            }
+            if (!modoEdicao) { itemSelecionadoId = null; }
             modalAberto = false;
             modalAcoesItem.classList.remove('active');
         }
@@ -453,15 +449,12 @@
             if (itemSelecionadoId) {
                 const itemAlvo = dadosInventario.find(item => item.id === itemSelecionadoId);
                 if (itemAlvo) {
-                    modoEdicao = true; // Ativa o modo de segurança de edição
-
-                    // Joga as informações atuais dele de volta pros campos visuais
-                    tipoAtivoSelect.value = itemAlvo.tipo;
+                    modoEdicao = true;
+                    tipoAtivoSelect.value = itemAlvo.tipo.charAt(0) + itemAlvo.tipo.slice(1).toLowerCase(); // Ajusta o select para bater com o case original
                     inputEtiqueta.value = itemAlvo.etiqueta;
 
                     fecharModalAcoes();
 
-                    // Sobe o painel com as informações para alteração, mas mantendo a linha original salva
                     modalAberto = true;
                     txtEtiquetaConfirmada.textContent = itemAlvo.etiqueta;
                     inputSN.value = itemAlvo.sn;
@@ -473,7 +466,7 @@
             }
         }
 
-        // Ouvintes Manuais
+        // Eventos e Atalhos de Teclado
         inputEtiqueta.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') { e.preventDefault(); processarEtiqueta(); }
         });
@@ -512,7 +505,7 @@
                     <td><strong>${item.tipo}</strong></td>
                     <td>${item.etiqueta}</td>
                     <td>${item.sn}</td>
-                    <td><span style="color: #5856d6; font-weight: 500;">${item.setor || "Não Informado"}</span></td>
+                    <td><span style="color: #5856d6; font-weight: 500;">${item.setor}</span></td>
                     <td class="col-acoes">
                         <button class="btn-deletar-item" onclick="abrirModalAcoes(${item.id})" title="Opções do item">🗑️</button>
                     </td>
@@ -521,6 +514,7 @@
             });
         }
 
+        // Exportação de Dados
         function baixarTXT() {
             if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
             let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
@@ -543,7 +537,7 @@
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += "Tipo de Ativo;Etiqueta Patrimonio;Numero de Serie (SN);Setor;Data e Hora\n";
             dadosInventario.forEach(item => {
-                csvContent += `"${item.tipo}";"${item.etiqueta}";"${item.sn}";"${item.setor || "Não Informado"}";"${item.dataHora}"\n`;
+                csvContent += `"${item.tipo}";"${item.etiqueta}";"${item.sn}";"${item.setor}";"${item.dataHora}"\n`;
             });
             dispararDownload(csvContent, 'inventario.csv');
         }
@@ -558,13 +552,12 @@
             document.body.removeChild(link);
         }
 
+        // Listeners Globais dos Botões
         btnSalvarModal.addEventListener('click', finalizarSalvarItem);
         btnCancelarModal.addEventListener('click', fecharModal);
-        
         btnExcluirItem.addEventListener('click', confirmarExclusao);
         btnEditarItem.addEventListener('click', iniciarEdicao);
         btnFecharModalAcoes.addEventListener('click', fecharModalAcoes);
-        
         document.getElementById('btnBaixarCSV').addEventListener('click', baixarCSV);
         document.getElementById('btnBaixarTXT').addEventListener('click', baixarTXT);
         
