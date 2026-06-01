@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventário Express</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #000;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 16px;
+        }
+
+        /* Área do Scanner */
+        #reader {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: none !important;
+            background: #000;
+        }
+
+        /* Formulário de Seleção */
+        .form-group {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #86868b;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 16px;
+            background-color: #fff;
+            -webkit-appearance: none;
+        }
+
+        /* Botões */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        .btn-success {
+            background-color: #34c759;
+            color: white;
+        }
+
+        .btn-primary {
+            background-color: #0071e3;
+            color: white;
+        }
+
+        /* Tabela / Lista de Itens */
+        .counter {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #0071e3;
+        }
+
+        .table-container {
+            width: 100%;
+            max-width: 500px;
+            max-height: 220px;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #e5e5ea;
+        }
+
+        th {
+            color: #86868b;
+            font-weight: 500;
+        }
+
+        td {
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Coletor de Ativos</h1>
+    </header>
+
+    <div class="container">
+        <div id="reader"></div>
+        
+        <div class="form-group">
+            <label for="tipoAtivo">Tipo de Ativo:</label>
+            <select id="tipoAtivo">
+                <option value="Monitor">Monitor</option>
+                <option value="Notebook">Notebook</option>
+                <option value="Desktop">Desktop</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="codigoManual">Código Lido:</label>
+            <input type="text" id="codigoManual" placeholder="Aguardando leitura do código...">
+        </div>
+
+        <button class="btn btn-success" id="btnSalvar">Salvar Item Manual</button>
+    </div>
+
+    <div class="table-container">
+        <div class="counter">Itens coletados: <span id="totalItens">0</span></div>
+        <table id="tabelaItens">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Código</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <div style="width: 100%; max-width: 500px;">
+        <button class="btn btn-primary" id="btnBaixar">Baixar Planilha (CSV)</button>
+        <button class="btn" style="background: #e5e5ea; color: #ff3b30; font-weight: 500;" id="btnLimpar">Limpar Tudo</button>
+    </div>
+
+    <script>
+        // Array de dados na memória do app
+        let dadosInventario = [];
+
+        // Elementos do DOM
+        const tipoAtivoSelect = document.getElementById('tipoAtivo');
+        const codigoManualInput = document.getElementById('codigoManual');
+        const btnSalvar = document.getElementById('btnSalvar');
+        const btnBaixar = document.getElementById('btnBaixar');
+        const btnLimpar = document.getElementById('btnLimpar');
+        const tabelaCorpo = document.querySelector('#tabelaItens tbody');
+        const totalItensSpan = document.getElementById('totalItens');
+
+        // Recupera dados salvos para evitar perdas caso a página atualize
+        if (localStorage.getItem('inventario_ativos')) {
+            dadosInventario = JSON.parse(localStorage.getItem('inventario_ativos'));
+            atualizarTabela();
+        }
+
+        // Função executada quando um código é lido com sucesso
+        function onScanSuccess(decodedText, decodedResult) {
+            // Vibração rápida para feedback tátil de leitura (se o celular suportar)
+            if (navigator.vibrate) navigator.vibrate(100);
+            
+            codigoManualInput.value = decodedText;
+            
+            // Salva de forma automática e imediata para agilizar o processo físico
+            salvarItem();
+        }
+
+        function onScanFailure(error) {
+            // Falhas de varredura por frame são normais na busca por foco, ignoradas por performance.
+        }
+
+        // Configuração otimizada para câmeras de celular e códigos de barras horizontais alongados
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", 
+            { 
+                fps: 20, 
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    // Caixa retangular (larga e mais baixa) perfeita para focar etiquetas de número de série
+                    return {
+                        width: Math.floor(viewfinderWidth * 0.85),
+                        height: Math.floor(viewfinderHeight * 0.35)
+                    };
+                },
+                rememberLastUsedCamera: true,
+                // Ativa os principais formatos usados em tags de hardware corporativo
+                formatsToSupport: [ 
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13
+                ],
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+            },
+            /* verbose= */ false
+        );
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+
+        // Função para persistir o item coletado
+        function salvarItem() {
+            const codigo = codigoManualInput.value.trim();
+            const tipo = tipoAtivoSelect.value;
+            const dataHora = new Date().toLocaleString('pt-BR');
+
+            if (!codigo) {
+                alert('Nenhum código detectado ou digitado.');
+                return;
+            }
+
+            // Insere no início ou fim da lista
+            dadosInventario.push({ tipo, codigo, dataHora });
+
+            // Atualiza o backup local offline
+            localStorage.setItem('inventario_ativos', JSON.stringify(dadosInventario));
+
+            // Atualiza a interface
+            atualizarTabela();
+
+            // Reseta o input de texto para a próxima leitura
+            codigoManualInput.value = '';
+        }
+
+        // Atualiza a visualização dos dados na tabela
+        function atualizarTabela() {
+            tabelaCorpo.innerHTML = '';
+            totalItensSpan.textContent = dadosInventario.length;
+
+            // Inverte a ordem apenas visualmente para mostrar o último lido no topo
+            [...dadosInventario].reverse().forEach(item => {
+                const linha = document.createElement('tr');
+                linha.innerHTML = `
+                    <td><strong>${item.tipo}</strong></td>
+                    <td>${item.codigo}</td>
+                `;
+                tabelaCorpo.appendChild(linha);
+            });
+        }
+
+        // Gera e faz download do arquivo CSV
+        function baixarCSV() {
+            if (dadosInventario.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+
+            // Garante compatibilidade de acentos no Excel (\uFEFF) e usa ';' como separador de colunas padrão brasileiro
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+            csvContent += "Tipo de Ativo;Codigo de Barras / Serial;Data e Hora\n";
+
+            dadosInventario.forEach(item => {
+                csvContent += `"${item.tipo}";"${item.codigo}";"${item.dataHora}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            
+            // Gera o nome baseado no dia atual
+            const dataDoArquivo = new Date().toISOString().slice(0, 10);
+            link.setAttribute("download", `inventario_${dataDoArquivo}.csv`);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Limpa a tabela e o armazenamento local
+        function limparDados() {
+            if (confirm('Deseja apagar permanentemente todos os registros coletados da tela?')) {
+                dadosInventario = [];
+                localStorage.removeItem('inventario_ativos');
+                atualizarTabela();
+            }
+        }
+
+        // Listeners de gatilhos
+        btnSalvar.addEventListener('click', salvarItem);
+        btnBaixar.addEventListener('click', baixarCSV);
+        btnLimpar.addEventListener('click', limparDados);
+    </script>
+</body>
+</html>
