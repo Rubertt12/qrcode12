@@ -194,7 +194,7 @@
     </div>
 
     <div class="table-container">
-        <div class="counter">Itens coletados: <span id="totalItens">0</span></div>
+        <div class="counter">Itens coletados no histórico: <span id="totalItens">0</span></div>
         <table id="tabelaItens">
             <thead>
                 <tr>
@@ -208,9 +208,9 @@
     </div>
 
     <div class="actions-grid">
-        <button class="btn btn-primary" id="btnBaixarCSV">Baixar Planilha (CSV)</button>
         <button class="btn btn-secondary" id="btnBaixarTXT">Baixar Bloco de Notas (TXT)</button>
-        <button class="btn" style="background: #e5e5ea; color: #ff3b30; font-weight: 500;" id="btnLimpar">Limpar Tudo</button>
+        <button class="btn btn-primary" id="btnBaixarCSV" style="background-color: #5856d6;">Baixar Planilha (CSV)</button>
+        <button class="btn" style="background: #e5e5ea; color: #ff3b30; font-weight: 500;" id="btnLimpar">Limpar Histórico Completo</button>
     </div>
 
     <script>
@@ -226,9 +226,9 @@
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
 
-        // Recupera backup local do navegador
-        if (localStorage.getItem('inventario_ativos')) {
-            dadosInventario = JSON.parse(localStorage.getItem('inventario_ativos'));
+        // Recupera o histórico acumulado de todos os dias
+        if (localStorage.getItem('inventario_acumulado_ativos')) {
+            dadosInventario = JSON.parse(localStorage.getItem('inventario_acumulado_ativos'));
             atualizarTabela();
         }
 
@@ -274,7 +274,7 @@
         );
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-        // Validação e inserção na lista
+        // Validação e inserção na lista acumulada
         function salvarItem() {
             const codigo = codigoManualInput.value.trim();
             const tipo = tipoAtivoSelect.value;
@@ -282,7 +282,7 @@
 
             if (!codigo) return;
 
-            // Validação anti-duplicidade
+            // Validação anti-duplicidade histórica (procura em todo o histórico já salvo)
             const codigoJaExiste = dadosInventario.some(item => item.codigo === codigo);
 
             if (codigoJaExiste) {
@@ -290,7 +290,7 @@
                 codigoManualInput.classList.add('input-erro');
                 codigoManualInput.value = `DUPLICADO: ${codigo}`;
                 
-                alert(`Atenção!\nO código [ ${codigo} ] já foi lido anteriormente.`);
+                alert(`Atenção!\nO código [ ${codigo} ] já existe no histórico acumulado deste inventário.`);
                 
                 codigoManualInput.classList.remove('input-erro');
                 codigoManualInput.value = '';
@@ -301,7 +301,8 @@
             codigoManualInput.classList.add('input-sucesso');
             
             dadosInventario.push({ tipo, codigo, dataHora });
-            localStorage.setItem('inventario_ativos', JSON.stringify(dadosInventario));
+            // Salva na chave acumulada que não zera sozinha
+            localStorage.setItem('inventario_acumulado_ativos', JSON.stringify(dadosInventario));
             
             atualizarTabela();
 
@@ -325,7 +326,33 @@
             });
         }
 
-        // Exportação em formato CSV (Excel)
+        // Exportação em formato TXT com nome fixo 'inventario.txt'
+        function baixarTXT() {
+            if (dadosInventario.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+
+            let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
+            txtContent += "=========================================================\n";
+            txtContent += "               HISTÓRICO ACUMULADO DE INVENTÁRIO         \n";
+            txtContent += "=========================================================\n\n";
+            txtContent += "TIPO         | CÓDIGO / SERIAL                 | DATA E HORA\n";
+            txtContent += "---------------------------------------------------------\n";
+
+            dadosInventario.forEach(item => {
+                let tipoFormatado = item.tipo.padEnd(12, ' ');
+                let codigoFormatado = item.codigo.padEnd(31, ' ');
+                txtContent += `${tipoFormatado}| ${codigoFormatado}| ${item.dataHora}\n`;
+            });
+
+            txtContent += "\n---------------------------------------------------------\n";
+            txtContent += `Total global de itens coletados: ${dadosInventario.length}\n`;
+
+            dispararDownload(txtContent, 'inventario.txt');
+        }
+
+        // Exportação em formato CSV com nome fixo 'inventario.csv'
         function baixarCSV() {
             if (dadosInventario.length === 0) {
                 alert('Não há dados para exportar.');
@@ -339,55 +366,26 @@
                 csvContent += `"${item.tipo}";"${item.codigo}";"${item.dataHora}"\n`;
             });
 
-            dispararDownload(csvContent, 'csv');
+            dispararDownload(csvContent, 'inventario.csv');
         }
 
-        // NOVA FUNÇÃO: Exportação em formato TXT (Bloco de Notas)
-        function baixarTXT() {
-            if (dadosInventario.length === 0) {
-                alert('Não há dados para exportar.');
-                return;
-            }
-
-            // Cabeçalho estruturado para o arquivo de texto
-            let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
-            txtContent += "=========================================================\n";
-            txtContent += "               INVENTÁRIO DE ATIVOS - COLETOR            \n";
-            txtContent += "=========================================================\n\n";
-            txtContent += "TIPO         | CÓDIGO / SERIAL                 | DATA E HORA\n";
-            txtContent += "---------------------------------------------------------\n";
-
-            dadosInventario.forEach(item => {
-                // Alinha o texto preenchendo espaços para simular colunas fixas organizadas
-                let tipoFormatado = item.tipo.padEnd(12, ' ');
-                let codigoFormatado = item.codigo.padEnd(31, ' ');
-                txtContent += `${tipoFormatado}| ${codigoFormatado}| ${item.dataHora}\n`;
-            });
-
-            txtContent += "\n---------------------------------------------------------\n";
-            txtContent += `Total de itens coletados: ${dadosInventario.length}\n`;
-
-            dispararDownload(txtContent, 'txt');
-        }
-
-        // Função auxiliar responsável pelo gatilho do download no dispositivo móvel
-        function dispararDownload(conteudo, extensao) {
+        // Realiza o download com o nome de arquivo exato configurado
+        function dispararDownload(conteudo, nomeArquivo) {
             const encodedUri = encodeURI(conteudo);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            
-            const dataDoArquivo = new Date().toISOString().slice(0, 10);
-            link.setAttribute("download", `inventario_${dataDoArquivo}.${extensao}`);
+            link.setAttribute("download", nomeArquivo);
             
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
 
+        // Esse botão limpa o histórico completo do celular se você quiser começar um inventário do zero
         function limparDados() {
-            if (confirm('Deseja apagar permanentemente todos os registros coletados da tela?')) {
+            if (confirm('ATENÇÃO!\nIsso apagará permanentemente TODO o histórico acumulado de todos os dias anteriores do celular. Deseja continuar?')) {
                 dadosInventario = [];
-                localStorage.removeItem('inventario_ativos');
+                localStorage.removeItem('inventario_acumulado_ativos');
                 atualizarTabela();
                 codigoManualInput.value = '';
             }
