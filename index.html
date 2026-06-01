@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário Express - Edição Segura</title>
+    <title>Inventário Express - Cloud</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
+    
     <style>
         * {
             box-sizing: border-box;
@@ -20,6 +21,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
         }
 
         header {
@@ -27,12 +29,31 @@
             max-width: 500px;
             text-align: center;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 600;
             color: #000;
+        }
+
+        .user-info {
+            font-size: 12px;
+            color: #86868b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #ff3b30;
+            cursor: pointer;
+            font-weight: 600;
         }
 
         .container {
@@ -45,7 +66,6 @@
             margin-bottom: 16px;
         }
 
-        /* Área do Scanner */
         #reader {
             width: 100%;
             border-radius: 8px;
@@ -54,7 +74,6 @@
             background: #000;
         }
 
-        /* Formulário de Seleção */
         .form-group {
             margin-top: 12px;
             display: flex;
@@ -76,20 +95,12 @@
             font-size: 16px;
             background-color: #fff;
             transition: all 0.2s ease;
-            text-transform: uppercase; /* Força CapsLock Visual */
+            text-transform: uppercase;
         }
 
-        .input-foco-azul {
-            border: 2px solid #0071e3 !important;
-            background-color: #f0f7ff;
-        }
+        .input-foco-azul { border: 2px solid #0071e3 !important; background-color: #f0f7ff; }
+        .input-erro { background-color: #ffebee !important; border-color: #ff3b30 !important; }
 
-        .input-erro {
-            background-color: #ffebee !important;
-            border-color: #ff3b30 !important;
-        }
-
-        /* Botões */
         .btn {
             width: 100%;
             padding: 14px;
@@ -115,18 +126,10 @@
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 6px;
-            transition: background 0.2s;
         }
-
         .btn-deletar-item:hover { background-color: #ffebee; }
 
-        /* Tabela / Lista de Itens */
-        .counter {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #0071e3;
-        }
+        .counter { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #0071e3; }
 
         .table-container {
             width: 100%;
@@ -140,73 +143,69 @@
             margin-bottom: 16px;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        th, td {
-            text-align: left;
-            padding: 8px;
-            border-bottom: 1px solid #e5e5ea;
-            vertical-align: middle;
-        }
-
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e5ea; vertical-align: middle; }
         th { color: #86868b; font-weight: 500; }
         td { word-break: break-all; }
-        
         .col-acoes { width: 40px; text-align: center; }
         .actions-grid { width: 100%; max-width: 500px; display: block; }
 
         /* Modais */
         .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(5px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center; z-index: 9999;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
         }
-
-        .modal-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
         .modal-box {
-            width: 90%;
-            max-width: 400px;
-            background-color: #ffffff;
-            border-radius: 14px;
-            padding: 20px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-            transform: scale(0.9);
-            transition: transform 0.2s ease;
+            width: 90%; max-width: 400px; background-color: #ffffff; border-radius: 14px;
+            padding: 20px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            transform: scale(0.9); transition: transform 0.2s ease;
         }
-
         .modal-overlay.active .modal-box { transform: scale(1); }
         .modal-header { font-size: 18px; font-weight: 600; color: #1d1d1f; margin-bottom: 14px; text-align: center; }
         .modal-resumo-etiqueta { background-color: #f5f5f7; padding: 10px; border-radius: 8px; font-size: 14px; text-align: left; margin-bottom: 16px; border: 1px dashed #d2d2d7; line-height: 1.5; }
+
+        /* Tela de Login Dedicada */
+        #telaLogin {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f5f5f7; display: flex; justify-content: center;
+            align-items: center; z-index: 10000; transition: all 0.3s ease;
+        }
+        #telaLogin.hidden { opacity: 0; pointer-events: none; }
+        .login-box { width: 90%; max-width: 380px; background: #fff; padding: 24px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); text-align: center; }
+        .login-box input { text-transform: none; margin-bottom: 12px; }
     </style>
 </head>
 <body>
 
+    <div id="telaLogin">
+        <div class="login-box">
+            <h2 style="margin-bottom: 8px; font-weight: 600;">Inventário Express</h2>
+            <p style="font-size: 14px; color:#86868b; margin-bottom: 20px;">Faça login para sincronizar seus ativos</p>
+            <div class="form-group" style="text-align: left;">
+                <label>E-mail:</label>
+                <input type="email" id="loginEmail" placeholder="seuemail@empresa.com">
+            </div>
+            <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+                <label>Senha:</label>
+                <input type="password" id="loginSenha" placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary" id="btnLogar" style="margin-top: 0;">Entrar</button>
+        </div>
+    </div>
+
     <header>
         <h1>Coletor de Ativos</h1>
+        <div class="user-info">
+            <span id="txtUserEmail">...</span>
+            <button class="btn-logout" id="btnSair">Sair</button>
+        </div>
     </header>
 
     <div class="container">
         <div id="reader"></div>
-
         <div class="form-group" style="margin-top: 16px;">
             <label for="tipoAtivo">Tipo de Ativo:</label>
             <select id="tipoAtivo">
@@ -215,10 +214,9 @@
                 <option value="Desktop">Desktop</option>
             </select>
         </div>
-
         <div class="form-group">
             <label for="inputEtiqueta">Leia ou digite a ETIQUETA (Patrimônio):</label>
-            <input type="text" id="inputEtiqueta" class="input-foco-azul" placeholder="Aguardando bip ou digitação...">
+            <input type="text" id="inputEtiqueta" class="input-foco-azul" placeholder="Aguardando bip...">
         </div>
     </div>
 
@@ -234,8 +232,7 @@
                     <th class="col-acoes"></th>
                 </tr>
             </thead>
-            <tbody>
-                </tbody>
+            <tbody></tbody>
         </table>
     </div>
 
@@ -250,17 +247,14 @@
             <div class="modal-resumo-etiqueta" style="text-align: center; margin-bottom: 8px;">
                 Etiqueta lida: <strong id="txtEtiquetaConfirmada">---</strong>
             </div>
-            
             <div class="form-group">
                 <label for="inputSN">Digite o S/N (Número de Série):</label>
-                <input type="text" id="inputSN" style="border: 2px solid #ff9500;" placeholder="Escreva o Serial aqui...">
+                <input type="text" id="inputSN" style="border: 2px solid #ff9500;" placeholder="Serial...">
             </div>
-
             <div class="form-group" style="margin-top: 8px;">
                 <label for="inputSetor">Informe o Setor / Localização:</label>
-                <input type="text" id="inputSetor" style="border: 2px solid #5856d6;" placeholder="Ex: RH, TI, Recepção...">
+                <input type="text" id="inputSetor" style="border: 2px solid #5856d6;" placeholder="Ex: RH, TI...">
             </div>
-
             <button class="btn btn-success" id="btnSalvarModal" style="margin-top: 16px;">Salvar Item</button>
             <button class="btn btn-secondary" id="btnCancelarModal" style="background-color: #e5e5ea; color: #1d1d1f; margin-top: 8px; padding: 8px; font-size: 14px;">Cancelar</button>
         </div>
@@ -269,178 +263,192 @@
     <div class="modal-overlay" id="modalAcoesItem">
         <div class="modal-box">
             <div class="modal-header">O que deseja fazer?</div>
-            
-            <div class="modal-resumo-etiqueta" id="resumoItemAlvo">
-                </div>
-
+            <div class="modal-resumo-etiqueta" id="resumoItemAlvo"></div>
             <button class="btn btn-primary" id="btnEditarItem" style="background-color: #0071e3;">✏️ Mudar Informações (Editar)</button>
             <button class="btn btn-danger" id="btnExcluirItem">🗑️ Excluir Permanentemente</button>
             <button class="btn btn-secondary" id="btnFecharModalAcoes" style="background-color: #e5e5ea; color: #1d1d1f; margin-top: 8px; padding: 8px; font-size: 14px;">Voltar</button>
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ⚠️ INSIRA AS CONFIGURAÇÕES DO SEU PROJETO FIREBASE AQUI:
+        const firebaseConfig = {
+         apiKey: "AIzaSyDGL2cstf5aadi_IB_3RdKBne7r74_jSCc",
+    authDomain: "qrcode-f0a67.firebaseapp.com",
+    projectId: "qrcode-f0a67",
+    storageBucket: "qrcode-f0a67.firebasestorage.app",
+    messagingSenderId: "205560170933",
+    appId: "1:205560170933:web:d4e46a2eb10bcce3f931fc"
+  };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
         let dadosInventario = [];
         let estaProcessandoLeitura = false;
         let modalAberto = false;
         let itemSelecionadoId = null;
         let modoEdicao = false;
+        let usuarioAtual = null;
 
-        // Declaração correta dos elementos do DOM
+        // Mapeamento DOM
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const inputEtiqueta = document.getElementById('inputEtiqueta');
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
-        
-        // Elementos do Modal 1
         const modalPasso2 = document.getElementById('modalPasso2');
         const inputSN = document.getElementById('inputSN');
         const inputSetor = document.getElementById('inputSetor');
         const txtEtiquetaConfirmada = document.getElementById('txtEtiquetaConfirmada');
         const btnSalvarModal = document.getElementById('btnSalvarModal');
         const btnCancelarModal = document.getElementById('btnCancelarModal');
-
-        // Elementos do Modal 2
         const modalAcoesItem = document.getElementById('modalAcoesItem');
         const resumoItemAlvo = document.getElementById('resumoItemAlvo');
         const btnEditarItem = document.getElementById('btnEditarItem');
         const btnExcluirItem = document.getElementById('btnExcluirItem');
         const btnFecharModalAcoes = document.getElementById('btnFecharModalAcoes');
 
-        // Carrega o Banco Local
-        if (localStorage.getItem('inventario_modal_etiqueta_sn_setor')) {
-            dadosInventario = JSON.parse(localStorage.getItem('inventario_modal_etiqueta_sn_setor'));
+        // Lógica de Autenticação Real
+        document.getElementById('btnLogar').addEventListener('click', async () => {
+            const email = document.getElementById('loginEmail').value.trim();
+            const senha = document.getElementById('loginSenha').value.trim();
+            try {
+                await signInWithEmailAndPassword(auth, email, senha);
+            } catch (error) {
+                alert("Erro ao entrar: Verifique as credenciais.");
+            }
+        });
+
+        document.getElementById('btnSair').addEventListener('click', () => {
+            signOut(auth);
+            window.location.reload();
+        });
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                usuarioAtual = user;
+                document.getElementById('txtUserEmail').textContent = user.email;
+                document.getElementById('telaLogin').classList.add('hidden');
+                await puxarDadosNuvem();
+                inputEtiqueta.focus();
+            } else {
+                document.getElementById('telaLogin').classList.remove('hidden');
+            }
+        });
+
+        // Sincronização Cloud (Firestore)
+        async function puxarDadosNuvem() {
+            if (!usuarioAtual) return;
+            const docRef = doc(db, "inventarios", usuarioAtual.uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                dadosInventario = docSnap.data().itens || [];
+            } else {
+                dadosInventario = [];
+            }
             atualizarTabela();
         }
 
-        // Funções do Scanner QR/Barcode
-        function onScanSuccess(decodedText, decodedResult) {
-            if (estaProcessandoLeitura || modalAberto) return;
+        async function salvarDadosNuvem() {
+            if (!usuarioAtual) return;
+            const docRef = doc(db, "inventarios", usuarioAtual.uid);
+            await setDoc(docRef, { itens: dadosInventario });
+        }
+
+        // Scanner QR/Barcode
+        window.onScanSuccess = function(decodedText, decodedResult) {
+            if (estaProcessandoLeitura || modalAberto || !usuarioAtual) return;
             estaProcessandoLeitura = true;
-
             inputEtiqueta.value = decodedText;
-            processarEtiqueta();
-
+            window.processarEtiqueta();
             setTimeout(() => { estaProcessandoLeitura = false; }, 1500);
         }
 
-        function onScanFailure(error) {}
-
         let html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-            fps: 25, 
-            qrbox: function(w, h) { return { width: Math.floor(w * 0.85), height: Math.floor(h * 0.35) }; },
-            rememberLastUsedCamera: true,
-            formatsToSupport: [
-                Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.EAN_13
-            ],
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+            fps: 25, qrbox: (w, h) => ({ width: Math.floor(w * 0.85), height: Math.floor(h * 0.35) }),
+            rememberLastUsedCamera: true, supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
         }, false);
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        html5QrcodeScanner.render(window.onScanSuccess, () => {});
 
-        // Processamento de Entrada
-        function processarEtiqueta() {
-            const etiquetaVal = inputEtiqueta.value.trim().toUpperCase(); // Persistência CapsLock
+        // Processamentos Internos
+        window.processarEtiqueta = function() {
+            const etiquetaVal = inputEtiqueta.value.trim().toUpperCase();
             if (!etiquetaVal) return;
 
             if (!modoEdicao) {
                 const etiquetaExiste = dadosInventario.some(item => item.etiqueta === etiquetaVal);
                 if (etiquetaExiste) {
-                    emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada anteriormente!`);
+                    emitirErro(inputEtiqueta, `A Etiqueta [ ${etiquetaVal} ] já foi cadastrada!`);
                     inputEtiqueta.value = '';
                     return;
                 }
             }
-
             if (navigator.vibrate) navigator.vibrate(100);
-            
             modalAberto = true;
             txtEtiquetaConfirmada.textContent = etiquetaVal;
             modalPasso2.classList.add('active');
-            
             setTimeout(() => { inputSN.focus(); }, 250);
         }
 
-        function finalizarSalvarItem() {
-            const etiquetaVal = inputEtiqueta.value.trim().toUpperCase(); // Persistência CapsLock
-            const snVal = inputSN.value.trim().toUpperCase();             // Persistência CapsLock
-            const setorVal = inputSetor.value.trim().toUpperCase() || "NÃO INFORMADO"; // Persistência CapsLock
+        async function finalizarSalvarItem() {
+            const etiquetaVal = inputEtiqueta.value.trim().toUpperCase();
+            const snVal = inputSN.value.trim().toUpperCase();
+            const setorVal = inputSetor.value.trim().toUpperCase() || "NÃO INFORMADO";
             const tipo = tipoAtivoSelect.value.toUpperCase();
             const dataHora = new Date().toLocaleString('pt-BR');
 
             if (!etiquetaVal) { fecharModal(); return; }
-            if (!snVal) {
-                alert("O Número de Série (S/N) é obrigatório.");
-                return;
-            }
+            if (!snVal) { alert("O S/N é obrigatório."); return; }
 
             const snExiste = dadosInventario.some(item => item.sn === snVal && item.id !== itemSelecionadoId);
             if (snExiste) {
-                emitirErro(inputSN, `O S/N [ ${snVal} ] já foi cadastrado em outro ativo!`);
+                emitirErro(inputSN, `O S/N [ ${snVal} ] já existe!`);
                 inputSN.value = '';
                 return;
             }
 
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            
             if (modoEdicao && itemSelecionadoId) {
-                dadosInventario = dadosInventario.map(item => {
-                    if (item.id === itemSelecionadoId) {
-                        return { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal };
-                    }
-                    return item;
-                });
+                dadosInventario = dadosInventario.map(item => item.id === itemSelecionadoId ? { ...item, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal } : item);
             } else {
-                const idUnico = Date.now();
-                dadosInventario.push({ id: idUnico, tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora });
+                dadosInventario.push({ id: Date.now(), tipo, etiqueta: etiquetaVal, sn: snVal, setor: setorVal, dataHora });
             }
 
-            localStorage.setItem('inventario_modal_etiqueta_sn_setor', JSON.stringify(dadosInventario));
+            await salvarDadosNuvem();
             atualizarTabela();
             fecharModal();
         }
 
         function fecharModal() {
-            modalAberto = false;
-            modoEdicao = false;
-            itemSelecionadoId = null; 
+            modalAberto = false; modoEdicao = false; itemSelecionadoId = null;
             modalPasso2.classList.remove('active');
-            inputEtiqueta.value = '';
-            inputSN.value = '';
-            inputSetor.value = '';
+            inputEtiqueta.value = ''; inputSN.value = ''; inputSetor.value = '';
             setTimeout(() => { inputEtiqueta.focus(); }, 200);
         }
 
-        function abrirModalAcoes(idItem) {
+        window.abrirModalAcoes = function(idItem) {
             const itemAlvo = dadosInventario.find(item => item.id === idItem);
             if (!itemAlvo) return;
-
-            itemSelecionadoId = idItem;
-            modalAberto = true;
-
-            resumoItemAlvo.innerHTML = `
-                <strong>Ativo:</strong> ${itemAlvo.tipo}<br>
-                <strong>Patrimônio:</strong> ${itemAlvo.etiqueta}<br>
-                <strong>S/N:</strong> ${itemAlvo.sn}<br>
-                <strong>Setor:</strong> ${itemAlvo.setor}
-            `;
-
+            itemSelecionadoId = idItem; modalAberto = true;
+            resumoItemAlvo.innerHTML = `<strong>Ativo:</strong> ${itemAlvo.tipo}<br><strong>Patrimônio:</strong> ${itemAlvo.etiqueta}<br><strong>S/N:</strong> ${itemAlvo.sn}<br><strong>Setor:</strong> ${itemAlvo.setor}`;
             modalAcoesItem.classList.add('active');
         }
 
         function fecharModalAcoes() {
-            if (!modoEdicao) { itemSelecionadoId = null; }
-            modalAberto = false;
-            modalAcoesItem.classList.remove('active');
+            if (!modoEdicao) itemSelecionadoId = null;
+            modalAberto = false; modalAcoesItem.classList.remove('active');
         }
 
-        function confirmarExclusao() {
+        async function confirmarExclusao() {
             if (itemSelecionadoId) {
                 dadosInventario = dadosInventario.filter(item => item.id !== itemSelecionadoId);
-                localStorage.setItem('inventario_modal_etiqueta_sn_setor', JSON.stringify(dadosInventario));
+                await salvarDadosNuvem();
                 atualizarTabela();
-                modoEdicao = false;
-                itemSelecionadoId = null;
+                modoEdicao = false; itemSelecionadoId = null;
                 fecharModalAcoes();
             }
         }
@@ -450,118 +458,67 @@
                 const itemAlvo = dadosInventario.find(item => item.id === itemSelecionadoId);
                 if (itemAlvo) {
                     modoEdicao = true;
-                    tipoAtivoSelect.value = itemAlvo.tipo.charAt(0) + itemAlvo.tipo.slice(1).toLowerCase(); // Ajusta o select para bater com o case original
+                    tipoAtivoSelect.value = itemAlvo.tipo.charAt(0) + itemAlvo.tipo.slice(1).toLowerCase();
                     inputEtiqueta.value = itemAlvo.etiqueta;
-
                     fecharModalAcoes();
-
                     modalAberto = true;
                     txtEtiquetaConfirmada.textContent = itemAlvo.etiqueta;
-                    inputSN.value = itemAlvo.sn;
-                    inputSetor.value = itemAlvo.setor || "";
-                    
+                    inputSN.value = itemAlvo.sn; inputSetor.value = itemAlvo.setor || "";
                     modalPasso2.classList.add('active');
                     setTimeout(() => { inputSN.focus(); }, 250);
                 }
             }
         }
 
-        // Eventos e Atalhos de Teclado
-        inputEtiqueta.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); processarEtiqueta(); }
-        });
-        inputEtiqueta.addEventListener('change', function() {
-            if (!modalAberto && inputEtiqueta.value.trim().length > 0) { processarEtiqueta(); }
-        });
-        
-        inputSN.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { 
-                e.preventDefault(); 
-                inputSetor.focus(); 
-            }
-        });
-
-        inputSetor.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { 
-                e.preventDefault(); 
-                finalizarSalvarItem(); 
-            }
-        });
-
-        function emitirErro(inputElement, message) {
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            inputElement.classList.add('input-erro');
-            alert(message);
-            inputElement.classList.remove('input-erro');
-        }
-
         function atualizarTabela() {
             tabelaCorpo.innerHTML = '';
             totalItensSpan.textContent = dadosInventario.length;
-
             [...dadosInventario].reverse().forEach(item => {
                 const linha = document.createElement('tr');
                 linha.innerHTML = `
-                    <td><strong>${item.tipo}</strong></td>
-                    <td>${item.etiqueta}</td>
-                    <td>${item.sn}</td>
+                    <td><strong>${item.tipo}</strong></td><td>${item.etiqueta}</td><td>${item.sn}</td>
                     <td><span style="color: #5856d6; font-weight: 500;">${item.setor}</span></td>
-                    <td class="col-acoes">
-                        <button class="btn-deletar-item" onclick="abrirModalAcoes(${item.id})" title="Opções do item">🗑️</button>
-                    </td>
-                `;
+                    <td class="col-acoes"><button class="btn-deletar-item" onclick="abrirModalAcoes(${item.id})">🗑️</button></td>`;
                 tabelaCorpo.appendChild(linha);
             });
         }
 
-        // Exportação de Dados
-        function baixarTXT() {
-            if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
-            let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
-            txtContent += "=========================================================================================\n";
-            txtContent += "               HISTÓRICO ACUMULADO DE INVENTÁRIO (ETIQUETA + S/N + SETOR)       \n";
-            txtContent += "=========================================================================================\n\n";
-            txtContent += "TIPO         | ETIQUETA         | S/N (SERIAL)                 | SETOR        | DATA E HORA\n-----------------------------------------------------------------------------------------\n";
-            dadosInventario.forEach(item => {
-                let tipoFormatado = item.tipo.padEnd(12, ' ');
-                let etqFormatado = item.etiqueta.padEnd(17, ' ');
-                let snFormatado = item.sn.padEnd(29, ' ');
-                let setorFormatado = (item.setor || "N/I").padEnd(13, ' ');
-                txtContent += `${tipoFormatado}| ${etqFormatado}| ${snFormatado}| ${setorFormatado}| ${item.dataHora}\n`;
-            });
-            dispararDownload(txtContent, 'inventario.txt');
+        function emitirErro(inputElement, message) {
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            inputElement.classList.add('input-erro'); alert(message); inputElement.classList.remove('input-erro');
         }
 
-        function baixarCSV() {
-            if (dadosInventario.length === 0) { alert('Não há dados.'); return; }
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-            csvContent += "Tipo de Ativo;Etiqueta Patrimonio;Numero de Serie (SN);Setor;Data e Hora\n";
-            dadosInventario.forEach(item => {
-                csvContent += `"${item.tipo}";"${item.etiqueta}";"${item.sn}";"${item.setor}";"${item.dataHora}"\n`;
-            });
-            dispararDownload(csvContent, 'inventario.csv');
-        }
-
-        function dispararDownload(conteudo, nomeArquivo) {
-            const encodedUri = encodeURI(conteudo);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", nomeArquivo);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Listeners Globais dos Botões
+        // Listeners Locais
+        inputEtiqueta.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.processarEtiqueta(); } });
+        inputEtiqueta.addEventListener('change', () => { if (!modalAberto && inputEtiqueta.value.trim().length > 0) window.processarEtiqueta(); });
+        inputSN.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inputSetor.focus(); } });
+        inputSetor.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); finalizarSalvarItem(); } });
+        
         btnSalvarModal.addEventListener('click', finalizarSalvarItem);
         btnCancelarModal.addEventListener('click', fecharModal);
         btnExcluirItem.addEventListener('click', confirmarExclusao);
         btnEditarItem.addEventListener('click', iniciarEdicao);
         btnFecharModalAcoes.addEventListener('click', fecharModalAcoes);
-        document.getElementById('btnBaixarCSV').addEventListener('click', baixarCSV);
-        document.getElementById('btnBaixarTXT').addEventListener('click', baixarTXT);
         
-        inputEtiqueta.focus();
+        document.getElementById('btnBaixarCSV').addEventListener('click', () => {
+            if (dadosInventario.length === 0) return;
+            let csv = "data:text/csv;charset=utf-8,\uFEFFTipo;Etiqueta;SN;Setor;Data\n";
+            dadosInventario.forEach(i => csv += `"${i.tipo}";"${i.etiqueta}";"${i.sn}";"${i.setor}";"${i.dataHora}"\n`);
+            dispararDownload(csv, 'inventario.csv');
+        });
+
+        document.getElementById('btnBaixarTXT').addEventListener('click', () => {
+            if (dadosInventario.length === 0) return;
+            let txt = "data:text/plain;charset=utf-8,\uFEFF";
+            dadosInventario.forEach(i => txt += `${i.tipo.padEnd(12)}| ${i.etiqueta.padEnd(15)}| ${i.sn.padEnd(25)}| ${i.setor}\n`);
+            dispararDownload(txt, 'inventario.txt');
+        });
+
+        function dispararDownload(conteudo, nome) {
+            const uri = encodeURI(conteudo); const link = document.createElement("a");
+            link.setAttribute("href", uri); link.setAttribute("download", nome);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>
