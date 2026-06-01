@@ -114,6 +114,11 @@
             color: white;
         }
 
+        .btn-secondary {
+            background-color: #86868b;
+            color: white;
+        }
+
         /* Tabela / Lista de Itens */
         .counter {
             font-size: 14px;
@@ -153,6 +158,12 @@
 
         td {
             word-break: break-all;
+        }
+
+        .actions-grid {
+            width: 100%;
+            max-width: 500px;
+            display: block;
         }
     </style>
 </head>
@@ -196,51 +207,50 @@
         </table>
     </div>
 
-    <div style="width: 100%; max-width: 500px;">
-        <button class="btn btn-primary" id="btnBaixar">Baixar Planilha (CSV)</button>
+    <div class="actions-grid">
+        <button class="btn btn-primary" id="btnBaixarCSV">Baixar Planilha (CSV)</button>
+        <button class="btn btn-secondary" id="btnBaixarTXT">Baixar Bloco de Notas (TXT)</button>
         <button class="btn" style="background: #e5e5ea; color: #ff3b30; font-weight: 500;" id="btnLimpar">Limpar Tudo</button>
     </div>
 
     <script>
         let dadosInventario = [];
-        let estaProcessandoLeitura = false; // Flag para evitar leituras múltiplas no mesmo milessegundo
+        let estaProcessandoLeitura = false;
 
         const tipoAtivoSelect = document.getElementById('tipoAtivo');
         const codigoManualInput = document.getElementById('codigoManual');
         const btnSalvar = document.getElementById('btnSalvar');
-        const btnBaixar = document.getElementById('btnBaixar');
+        const btnBaixarCSV = document.getElementById('btnBaixarCSV');
+        const btnBaixarTXT = document.getElementById('btnBaixarTXT');
         const btnLimpar = document.getElementById('btnLimpar');
         const tabelaCorpo = document.querySelector('#tabelaItens tbody');
         const totalItensSpan = document.getElementById('totalItens');
 
-        // Carrega dados do LocalStorage se houver
+        // Recupera backup local do navegador
         if (localStorage.getItem('inventario_ativos')) {
             dadosInventario = JSON.parse(localStorage.getItem('inventario_ativos'));
             atualizarTabela();
         }
 
-        // Função executada no sucesso da leitura
+        // Evento de sucesso na leitura do código
         function onScanSuccess(decodedText, decodedResult) {
-            // Se já estiver processando uma leitura ou a janela de alerta estiver aberta, ignora frames extras
             if (estaProcessandoLeitura) return;
             
             estaProcessandoLeitura = true;
             codigoManualInput.value = decodedText;
             
-            // Dispara a função de salvar e validação
             salvarItem();
             
-            // Pequeno delay para liberar a câmera para o próximo código físico diferente
             setTimeout(() => {
                 estaProcessandoLeitura = false;
             }, 1500);
         }
 
         function onScanFailure(error) {
-            // Ignora falhas de foco contínuas da câmera
+            // Ignora frames sem leitura válida
         }
 
-        // Configuração do Scanner de câmera traseira
+        // Inicialização do leitor
         let html5QrcodeScanner = new Html5QrcodeScanner(
             "reader", 
             { 
@@ -264,38 +274,30 @@
         );
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-        // Salva o item aplicando a regra de não duplicidade
+        // Validação e inserção na lista
         function salvarItem() {
             const codigo = codigoManualInput.value.trim();
             const tipo = tipoAtivoSelect.value;
             const dataHora = new Date().toLocaleString('pt-BR');
 
-            if (!codigo) {
-                return;
-            }
+            if (!codigo) return;
 
-            // REGRA PRINCIPAL: Verifica se o código já existe no array de inventário
+            // Validação anti-duplicidade
             const codigoJaExiste = dadosInventario.some(item => item.codigo === codigo);
 
             if (codigoJaExiste) {
-                // Feedback tátil de erro (vibra 2 vezes rápido se o celular suportar)
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                
-                // Feedback visual de erro
                 codigoManualInput.classList.add('input-erro');
                 codigoManualInput.value = `DUPLICADO: ${codigo}`;
                 
-                alert(`Atenção!\nO código [ ${codigo} ] já foi lido anteriormente neste inventário.`);
+                alert(`Atenção!\nO código [ ${codigo} ] já foi lido anteriormente.`);
                 
-                // Reseta o campo após fechar o alerta
                 codigoManualInput.classList.remove('input-erro');
                 codigoManualInput.value = '';
                 return;
             }
 
-            // Se for um código novo, prossegue e adiciona
-            if (navigator.vibrate) navigator.vibrate(100); // Vibra 1x para sucesso
-            
+            if (navigator.vibrate) navigator.vibrate(100);
             codigoManualInput.classList.add('input-sucesso');
             
             dadosInventario.push({ tipo, codigo, dataHora });
@@ -303,7 +305,6 @@
             
             atualizarTabela();
 
-            // Remove o efeito verde após 1 segundo e limpa o input para o próximo hardware
             setTimeout(() => {
                 codigoManualInput.classList.remove('input-sucesso');
                 codigoManualInput.value = '';
@@ -324,6 +325,7 @@
             });
         }
 
+        // Exportação em formato CSV (Excel)
         function baixarCSV() {
             if (dadosInventario.length === 0) {
                 alert('Não há dados para exportar.');
@@ -337,12 +339,45 @@
                 csvContent += `"${item.tipo}";"${item.codigo}";"${item.dataHora}"\n`;
             });
 
-            const encodedUri = encodeURI(csvContent);
+            dispararDownload(csvContent, 'csv');
+        }
+
+        // NOVA FUNÇÃO: Exportação em formato TXT (Bloco de Notas)
+        function baixarTXT() {
+            if (dadosInventario.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+
+            // Cabeçalho estruturado para o arquivo de texto
+            let txtContent = "data:text/plain;charset=utf-8,\uFEFF";
+            txtContent += "=========================================================\n";
+            txtContent += "               INVENTÁRIO DE ATIVOS - COLETOR            \n";
+            txtContent += "=========================================================\n\n";
+            txtContent += "TIPO         | CÓDIGO / SERIAL                 | DATA E HORA\n";
+            txtContent += "---------------------------------------------------------\n";
+
+            dadosInventario.forEach(item => {
+                // Alinha o texto preenchendo espaços para simular colunas fixas organizadas
+                let tipoFormatado = item.tipo.padEnd(12, ' ');
+                let codigoFormatado = item.codigo.padEnd(31, ' ');
+                txtContent += `${tipoFormatado}| ${codigoFormatado}| ${item.dataHora}\n`;
+            });
+
+            txtContent += "\n---------------------------------------------------------\n";
+            txtContent += `Total de itens coletados: ${dadosInventario.length}\n`;
+
+            dispararDownload(txtContent, 'txt');
+        }
+
+        // Função auxiliar responsável pelo gatilho do download no dispositivo móvel
+        function dispararDownload(conteudo, extensao) {
+            const encodedUri = encodeURI(conteudo);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             
             const dataDoArquivo = new Date().toISOString().slice(0, 10);
-            link.setAttribute("download", `inventario_${dataDoArquivo}.csv`);
+            link.setAttribute("download", `inventario_${dataDoArquivo}.${extensao}`);
             
             document.body.appendChild(link);
             link.click();
@@ -359,7 +394,8 @@
         }
 
         btnSalvar.addEventListener('click', salvarItem);
-        btnBaixar.addEventListener('click', baixarCSV);
+        btnBaixarCSV.addEventListener('click', baixarCSV);
+        btnBaixarTXT.addEventListener('click', baixarTXT);
         btnLimpar.addEventListener('click', limparDados);
     </script>
 </body>
